@@ -30,8 +30,20 @@
 #include "nrf.h"
 #include "mphalport.h"
 #include "hal_uart.h"
+#include "lib/utils/interrupt_char.h"
 
 #ifdef HAL_UART_MODULE_ENABLED
+
+#if MICROPY_KBD_EXCEPTION
+#include "hal_irq.h"
+#include "ringbuffer.h"
+
+ringBuffer_typedef(uint8_t, ringbuffer_t);
+
+static ringbuffer_t   m_rx_ring_buffer;
+static ringbuffer_t * mp_rx_ring_buffer = &m_rx_ring_buffer;
+static uint8_t        m_rx_ring_buffer_data[20];
+#endif
 
 uint32_t hal_uart_baudrate_lookup[] = {
     UART_BAUDRATE_BAUDRATE_Baud1200,   ///< 1200 baud.
@@ -65,6 +77,35 @@ hal_uart_error_t hal_uart_char_write(NRF_UART_Type * p_instance, uint8_t ch) {
     return p_instance->ERRORSRC;
 }
 
+#if MICROPY_KBD_EXCEPTION
+hal_uart_error_t hal_uart_char_read(NRF_UART_Type * p_instance, uint8_t * ch) {
+    while (isBufferEmpty(mp_rx_ring_buffer)) {
+        __WFE();
+    }
+
+    uint8_t byte;
+    bufferRead(mp_rx_ring_buffer, byte);
+    *ch = byte;
+
+    return HAL_UART_ERROR_NONE;
+}
+
+void UART0_IRQHandler(void) {
+    if (UART_BASE(0)->EVENTS_RXDRDY) {
+        UART_BASE(0)->EVENTS_RXDRDY = 0;
+        char c = UART_BASE(0)->RXD;
+        #if MICROPY_KBD_EXCEPTION
+        if (c == mp_interrupt_char) {
+            mp_keyboard_interrupt();
+        } else
+        #endif
+        {
+            bufferWrite(mp_rx_ring_buffer, c);
+        }
+    }
+}
+
+#else // #if !MICROPY_KBD_EXCEPTION
 hal_uart_error_t hal_uart_char_read(NRF_UART_Type * p_instance, uint8_t * ch) {
     p_instance->ERRORSRC = 0;
     while (p_instance->EVENTS_RXDRDY != 1) {
@@ -76,6 +117,7 @@ hal_uart_error_t hal_uart_char_read(NRF_UART_Type * p_instance, uint8_t * ch) {
 
     return p_instance->ERRORSRC;
 }
+#endif // !MICROPY_KBD_EXCEPTION
 
 hal_uart_error_t hal_uart_buffer_write(NRF_UART_Type * p_instance, uint8_t * p_buffer, uint32_t num_of_bytes, uart_complete_cb cb) {
     int i = 0;
@@ -135,12 +177,33 @@ void hal_uart_init(NRF_UART_Type * p_instance, hal_uart_init_t const * p_uart_in
         p_instance->CONFIG  = (UART_CONFIG_HWFC_Enabled << UART_CONFIG_HWFC_Pos);
     }
 
+#if MICROPY_KBD_EXCEPTION
+    // initialize ring buffer
+    m_rx_ring_buffer.size  = sizeof(m_rx_ring_buffer_data) + 1;
+    m_rx_ring_buffer.start = 0;
+    m_rx_ring_buffer.end   = 0;
+    m_rx_ring_buffer.elems = m_rx_ring_buffer_data;
+
+#if NRF51
+    hal_irq_enable(UART0_IRQn);
+#elif NRF52
+    hal_irq_enable(UARTE0_UART0_IRQn);
+#else
+    #error Unknown chip
+#endif
+
+#endif // MICROPY_KBD_EXCEPTION
+
+
     p_instance->BAUDRATE      = (hal_uart_baudrate_lookup[p_uart_init->baud_rate]);
     p_instance->ENABLE        = (UART_ENABLE_ENABLE_Enabled << UART_ENABLE_ENABLE_Pos);
     p_instance->EVENTS_TXDRDY = 0;
     p_instance->EVENTS_RXDRDY = 0;
     p_instance->TASKS_STARTTX = 1;
     p_instance->TASKS_STARTRX = 1;
+#if MICROPY_KBD_EXCEPTION
+    p_instance->INTENSET = (UART_INTENSET_RXDRDY_Set << UART_INTENSET_RXDRDY_Pos);
+#endif
 }
 
 #endif // HAL_UART_MODULE_ENABLED
