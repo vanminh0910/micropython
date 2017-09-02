@@ -571,12 +571,23 @@ STATIC mp_obj_t mod_pixels_fill_rainbow_array_(mp_obj_t pixels, mp_obj_t array) 
     mp_get_buffer_raise(pixels, &pixelinfo, MP_BUFFER_WRITE);
     mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_READ);
     uint32_t *p = (uint32_t*)pixelinfo.buf;
-    uint8_t *a = (uint8_t*)arrayinfo.buf;
     size_t len = pixelinfo.len/4;
-    if (arrayinfo.len < len)
-        len = arrayinfo.len;
-    for (int i=0; i<len; i++) {
-        p[i] = mod_pixels_hsv2rgb_rainbow(*a++, 255, 255);
+    if (arrayinfo.typecode == BYTEARRAY_TYPECODE || arrayinfo.typecode == 'B') {
+        if (arrayinfo.len < len)
+            len = arrayinfo.len;
+        uint8_t *a = (uint8_t*)arrayinfo.buf;
+        for (int i=0; i<len; i++) {
+            p[i] = mod_pixels_hsv2rgb_rainbow(*a++, 255, 255);
+        }
+    } else if (arrayinfo.typecode == 'H') {
+        if (arrayinfo.len/2 < len)
+            len = arrayinfo.len/2;
+        uint16_t *a = (uint16_t*)arrayinfo.buf;
+        for (int i=0; i<len; i++) {
+            p[i] = mod_pixels_hsv2rgb_rainbow(*a++ >> 8, 255, 255);
+        }
+    } else {
+        mp_raise_ValueError("bad array");
     }
     return mp_const_none;
 }
