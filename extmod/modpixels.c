@@ -497,9 +497,9 @@ uint8_t mod_pixels_inoise8(uint16_t x, uint16_t y) {
 
 
 STATIC mp_obj_t mod_pixels_hsv2rgb_rainbow_(mp_obj_t hue, mp_obj_t sat, mp_obj_t val) {
-    uint32_t h = mp_obj_get_int(hue);
-    uint32_t s = mp_obj_get_int(sat);
-    uint32_t v = mp_obj_get_int(val);
+    uint8_t h = mp_obj_get_float(hue) * 255.0f + 0.5f;
+    uint8_t s = mp_obj_get_float(sat) * 255.0f + 0.5f;
+    uint8_t v = mp_obj_get_float(val) * 255.0f + 0.5f;
     return mp_obj_new_int(mod_pixels_hsv2rgb_rainbow(h, s, v));
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(mod_pixels_hsv2rgb_rainbow_obj, mod_pixels_hsv2rgb_rainbow_);
@@ -513,15 +513,18 @@ STATIC mp_obj_t mod_pixels_color_from_palette_(mp_obj_t palette, mp_obj_t index,
     }
     uint32_t *pal = (uint32_t*)paletteinfo.buf;
     uint32_t idx = mp_obj_get_int(index);
-    uint8_t bright = mp_obj_get_int(brightness);
-    return mp_obj_new_int(mod_pixels_color_from_palette(pal, idx, bright));
+    float bright = mp_obj_get_float(brightness);
+    if (bright < 0.0f || bright > 1.0f) {
+        mp_raise_ValueError("bad brightness");
+    }
+    return mp_obj_new_int(mod_pixels_color_from_palette(pal, idx, bright * 255.0f + 0.5f));
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(mod_pixels_color_from_palette_obj, mod_pixels_color_from_palette_);
 
 
 STATIC mp_obj_t mod_pixels_noise16_(size_t n_args, const mp_obj_t *args) {
-    uint32_t x = mp_obj_get_int(args[0]);
-    uint32_t y = mp_obj_get_int(args[1]);
+    uint32_t x = mp_obj_get_float(args[0]) * 65535.0f + 0.5f;
+    uint32_t y = mp_obj_get_float(args[1]) * 65535.0f + 0.5f;
     uint16_t result = mod_pixels_inoise16(x, y);
     return mp_obj_new_int(result);
 }
@@ -545,11 +548,15 @@ STATIC mp_obj_t mod_pixels_fill_rainbow_(mp_obj_t buf, mp_obj_t huestart, mp_obj
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf, &bufinfo, MP_BUFFER_WRITE);
     uint32_t *pixels = (uint32_t*)bufinfo.buf;
-    uint8_t h  = mp_obj_get_int(huestart);
-    int8_t inc = mp_obj_get_int(hueinc);
+    float hue_f = mp_obj_get_float(huestart);
+    if (hue_f < 0.0f || hue_f > 1.0f) {
+        mp_raise_ValueError("bad huestart");
+    }
+    uint8_t hue  = hue_f * 255.0f + 0.5f;
+    int8_t inc = mp_obj_get_float(hueinc) * 255.0f + 0.5f;
     for (int i=0; i<bufinfo.len/4; i++) {
-        pixels[i] = mod_pixels_hsv2rgb_rainbow(h, 255, 255);
-        h += inc;
+        pixels[i] = mod_pixels_hsv2rgb_rainbow(hue, 255, 255);
+        hue += inc;
     }
     return mp_const_none;
 }
@@ -594,10 +601,11 @@ STATIC mp_obj_t mod_pixels_fill_palette_array_(const size_t n_args, const mp_obj
     }
     int32_t brightness = 255;
     if (n_args >= 4) {
-        brightness = mp_obj_get_int(args[3]);
-        if (brightness < 0 || brightness > 0xff) {
+        float b = mp_obj_get_float(args[3]);
+        if (b < 0.0f || b > 1.0f) {
             mp_raise_ValueError("bad brightness");
         }
+        brightness = b * 255.0f + 0.5f;
     }
     uint32_t *pixels = (uint32_t*)pixelinfo.buf;
     uint32_t *palette = (uint32_t*)paletteinfo.buf;
@@ -628,7 +636,7 @@ STATIC mp_obj_t mod_pixels_scale8_video_(mp_obj_t array, mp_obj_t value) {
     mp_buffer_info_t arrayinfo;
     mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
     uint8_t *a = (uint8_t*)arrayinfo.buf;
-    uint32_t val = mp_obj_get_int(value);
+    uint32_t val = mp_obj_get_float(value) * 255.0f + 0.5f;
     for (int i=0; i<arrayinfo.len; i++) {
         a[i] = mod_pixels_scale8_video(a[i], val);
     }
@@ -641,7 +649,7 @@ STATIC mp_obj_t mod_pixels_scale8_raw_(mp_obj_t array, mp_obj_t value) {
     mp_buffer_info_t arrayinfo;
     mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
     uint8_t *a = (uint8_t*)arrayinfo.buf;
-    uint32_t val = mp_obj_get_int(value);
+    uint32_t val = mp_obj_get_float(value) * 255.0f + 0.5f;
     for (int i=0; i<arrayinfo.len; i++) {
         a[i] = mod_pixels_scale8(a[i], val);
     }
@@ -654,7 +662,7 @@ STATIC mp_obj_t mod_pixels_scale16_raw_(mp_obj_t array, mp_obj_t value) {
     mp_buffer_info_t arrayinfo;
     mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
     uint16_t *a = (uint16_t*)arrayinfo.buf;
-    uint32_t val = mp_obj_get_int(value);
+    uint32_t val = mp_obj_get_float(value) * 65535.0f + 0.5f;
     for (int i=0; i<arrayinfo.len/2; i++) {
         a[i] = mod_pixels_scale16(a[i], val);
     }
