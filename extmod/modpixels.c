@@ -57,8 +57,7 @@ uint32_t mod_pixels_nbits(uint32_t x) {
 #define K170 170
 #define K85  85
 
-int mod_pixels_scale8(int i, int frac)
-{
+int mod_pixels_scale8(int i, int frac) {
     return (i * (1+frac)) >> 8;
 }
 
@@ -71,8 +70,7 @@ uint16_t mod_pixels_scale16(uint16_t i, uint32_t scale) {
 ///  inputs are non-zero, the output is guaranteed to be non-zero.
 ///  This makes for better 'video'/LED dimming, at the cost of
 ///  several additional cycles.
-uint8_t mod_pixels_scale8_video( int i, int scale)
-{
+uint8_t mod_pixels_scale8_video(int i, int scale) {
     uint8_t j = ((i * scale) >> 8) + ((i && scale) ? 1 : 0);
     // uint8_t nonzeroscale = (scale != 0) ? 1 : 0;
     // uint8_t j = (i == 0) ? 0 : (((int)i * (int)(scale) ) >> 8) + nonzeroscale;
@@ -80,8 +78,7 @@ uint8_t mod_pixels_scale8_video( int i, int scale)
 }
 
 
-uint32_t mod_pixels_hsv2rgb_rainbow(uint8_t hue, uint8_t sat, uint8_t val)
-{
+uint32_t mod_pixels_hsv2rgb_rainbow(uint8_t hue, uint8_t sat, uint8_t val) {
     // Yellow has a higher inherent brightness than
     // any other color; 'pure' yellow is perceived to
     // be 93% as bright as white.  In order to make
@@ -310,8 +307,7 @@ uint32_t mod_pixels_color_from_palette(uint32_t *pal, uint16_t index, uint8_t br
 
 /// linear interpolation between two signed 15-bit values,
 /// with 8-bit fraction
-int16_t mod_pixels_lerp15by16( int16_t a, int16_t b, uint16_t frac)
-{
+int16_t mod_pixels_lerp15by16(int16_t a, int16_t b, uint16_t frac) {
     int16_t result;
     if( b > a) {
         uint16_t delta = b - a;
@@ -325,8 +321,7 @@ int16_t mod_pixels_lerp15by16( int16_t a, int16_t b, uint16_t frac)
     return result;
 }
 
-static int8_t inline __attribute__((always_inline)) mod_pixels_lerp7by8( int8_t a, int8_t b, uint8_t frac)
-{
+static int8_t inline __attribute__((always_inline)) mod_pixels_lerp7by8(int8_t a, int8_t b, uint8_t frac) {
     // int8_t delta = b - a;
     // int16_t prod = (uint16_t)delta * (uint16_t)frac;
     // int8_t scaled = prod >> 8;
@@ -350,8 +345,7 @@ static int8_t inline __attribute__((always_inline)) mod_pixels_lerp7by8( int8_t 
 ///       integers (int16_t)
 ///       If the first argument is even, result is rounded down.
 ///       If the first argument is odd, result is result up.
-int16_t mod_pixels_avg15( int16_t i, int16_t j)
-{
+int16_t mod_pixels_avg15(int16_t i, int16_t j) {
     return ((int32_t)((int32_t)(i) + (int32_t)(j)) >> 1) + (i & 0x1);
 }
 
@@ -359,8 +353,7 @@ int16_t mod_pixels_avg15( int16_t i, int16_t j)
 ///       integers (int8_t)
 ///       If the first argument is even, result is rounded down.
 ///       If the first argument is odd, result is result up.
-int8_t mod_pixels_avg7( int8_t i, int8_t j)
-{
+int8_t mod_pixels_avg7(int8_t i, int8_t j) {
     return ((i + j) >> 1) + (i & 0x1);
 }
 
@@ -374,8 +367,7 @@ static int16_t inline __attribute__((always_inline)) mod_pixels_grad16(uint8_t h
   return mod_pixels_avg15(u,v);
 }
 
-static int8_t inline __attribute__((always_inline)) mod_pixels_grad8(uint8_t hash, int8_t x, int8_t y)
-{
+static int8_t inline __attribute__((always_inline)) mod_pixels_grad8(uint8_t hash, int8_t x, int8_t y) {
   // since the tests below can be done bit-wise on the bottom
   // three bits, there's no need to mask off the higher bits
   //  hash = hash & 7;
@@ -415,8 +407,7 @@ static uint8_t const mod_pixels_noise_p[] = { 151,160,137,91,90,15,
 #define LERP(a,b,u) mod_pixels_lerp15by16(a,b,u)
 
 
-int16_t mod_pixels_inoise16_raw(uint32_t x, uint32_t y)
-{
+int16_t mod_pixels_inoise16_raw(uint32_t x, uint32_t y) {
   // Find the unit cube containing the point
   uint8_t X = x>>16;
   uint8_t Y = y>>16;
@@ -463,8 +454,7 @@ uint16_t mod_pixels_inoise16(uint32_t x, uint32_t y) {
   // return scale16by8(inoise16_raw(x,y)+17308,242)<<1;
 }
 
-int8_t inoise8_raw(uint16_t x, uint16_t y)
-{
+int8_t inoise8_raw(uint16_t x, uint16_t y) {
   // Find the unit cube containing the point
   uint8_t X = x>>8;
   uint8_t Y = y>>8;
@@ -939,4 +929,4 @@ const mp_obj_module_t mp_module_pixels = {
     .globals = (mp_obj_dict_t*)&mp_module_pixels_globals,
 };
 
-#endif
+#endif // MICROPY_PY_PIXELS
