@@ -37,6 +37,8 @@
 
 #if MICROPY_PY_PIXELS
 
+//#define MICROPY_PY_PIXELS_SMALL_FUNCTIONS
+
 // https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
 #define powerof2(x) ((x & (x - 1)) == 0)
 
@@ -495,6 +497,7 @@ uint8_t mod_pixels_inoise8(uint16_t x, uint16_t y) {
 
 /**** END FASTLED CODE ****/
 
+#ifdef MICROPY_PY_PIXELS_SMALL_FUNCTIONS
 
 STATIC mp_obj_t mod_pixels_hsv2rgb_rainbow_(mp_obj_t hue, mp_obj_t sat, mp_obj_t val) {
     uint8_t h = mp_obj_get_float(hue) * 255.0f + 0.5f;
@@ -529,6 +532,8 @@ STATIC mp_obj_t mod_pixels_noise16_(size_t n_args, const mp_obj_t *args) {
     return mp_obj_new_int(result);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_pixels_noise16_obj, 2, 2, mod_pixels_noise16_);
+
+#endif // MICROPY_PY_PIXELS_SMALL_FUNCTIONS
 
 
 STATIC mp_obj_t mod_pixels_fill_solid_(mp_obj_t buf, mp_obj_t color) {
@@ -911,9 +916,11 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_pixels_array_copy_obj, mod_pixels_array_cop
 
 STATIC const mp_rom_map_elem_t mp_module_pixels_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR__pixels) },
+#ifdef MICROPY_PY_PIXELS_SMALL_FUNCTIONS
     { MP_ROM_QSTR(MP_QSTR_hsv2rgb_rainbow), MP_ROM_PTR(&mod_pixels_hsv2rgb_rainbow_obj) },
     { MP_ROM_QSTR(MP_QSTR_color_from_palette), MP_ROM_PTR(&mod_pixels_color_from_palette_obj) },
     { MP_ROM_QSTR(MP_QSTR_noise16), MP_ROM_PTR(&mod_pixels_noise16_obj) },
+#endif
     { MP_ROM_QSTR(MP_QSTR_fill_solid), MP_ROM_PTR(&mod_pixels_fill_solid_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_rainbow), MP_ROM_PTR(&mod_pixels_fill_rainbow_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_rainbow_array), MP_ROM_PTR(&mod_pixels_fill_rainbow_array_obj) },
