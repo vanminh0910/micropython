@@ -235,6 +235,7 @@ PY_O_BASENAME = \
 	../extmod/modwebsocket.o \
 	../extmod/modwebrepl.o \
 	../extmod/modframebuf.o \
+	../extmod/modpixels.o \
 	../extmod/vfs.o \
 	../extmod/vfs_reader.o \
 	../extmod/vfs_fat.o \

@@ -1161,6 +1161,10 @@ typedef double mp_float_t;
 #define MICROPY_PY_BTREE (0)
 #endif
 
+#ifndef MICROPY_PY_PIXELS
+#define MICROPY_PY_PIXELS (0)
+#endif
+
 /*****************************************************************************/
 /* Hooks for a port to add builtins                                          */
 
