@@ -29,28 +29,12 @@
 #include "py/runtime0.h"
 #include "py/stream.h"
 #include "py/binary.h"
-
-#include "etshal.h"
-
-// for benchmarks
-//#include "esp_mphal.h"
+#include "py/mphal.h" // mp_hal_ticks_ms
+#include "etshal.h"   // WDEV_HWRNG on the ESP8266
 
 #if MICROPY_PY_PIXELS
 
 //#define MICROPY_PY_PIXELS_SMALL_FUNCTIONS
-
-// https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
-#define powerof2(x) ((x & (x - 1)) == 0)
-
-// Only works for powers of 2 and up to 15 bits
-// https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
-uint32_t mod_pixels_nbits(uint32_t x) {
-    uint32_t r = (x & 0xAA) != 0; // 0xAAAAAAAA
-    //r |= ((x & 0xFF00FF00) != 0) << 3; // 0xFF00FF00
-    r |= ((x & 0xF0) != 0) << 2; // 0xF0F0F0F0
-    r |= ((x & 0xCC) != 0) << 1; // 0xCCCCCCCC
-    return r;
-}
 
 /**** BEGIN FASTLED CODE ****/
 
@@ -494,8 +478,75 @@ uint8_t mod_pixels_inoise8(uint16_t x, uint16_t y) {
   return mod_pixels_scale8(69+inoise8_raw(x,y),237)<<1;
 }
 
+/// Fast 16-bit approximation of sin(x). This approximation never varies more than
+/// 0.69% from the floating point value you'd get by doing
+///
+///     float s = sin(x) * 32767.0;
+///
+/// @param theta input angle from 0-65535
+/// @returns sin of theta, value between -32767 to 32767.
+int16_t mod_pixels_sin16(uint16_t theta) {
+    static const uint16_t base[] =
+    { 0, 6393, 12539, 18204, 23170, 27245, 30273, 32137 };
+    static const uint8_t slope[] =
+    { 49, 48, 44, 38, 31, 23, 14, 4 };
+
+    uint16_t offset = (theta & 0x3FFF) >> 3; // 0..2047
+    if( theta & 0x4000 ) offset = 2047 - offset;
+
+    uint8_t section = offset / 256; // 0..7
+    uint16_t b   = base[section];
+    uint8_t  m   = slope[section];
+
+    uint8_t secoffset8 = (uint8_t)(offset) / 2;
+
+    uint16_t mx = m * secoffset8;
+    int16_t  y  = mx + b;
+
+    if (theta & 0x8000) {
+        y = -y;
+    }
+
+    return y;
+}
+
+// TODO use a better counter, this one wraps around fast.
+#define GET_MILLIS mp_hal_ticks_ms
+
+// beat88 generates a 16-bit 'sawtooth' wave at a given BPM,
+///        with BPM specified in Q8.8 fixed-point format; e.g.
+///        for this function, 120 BPM MUST BE specified as
+///        120*256 = 30720.
+///        If you just want to specify "120", use beat16 or beat8.
+inline uint16_t mod_pixels_beat88(uint16_t beats_per_minute_88, uint32_t timebase) {
+    // BPM is 'beats per minute', or 'beats per 60000ms'.
+    // To avoid using the (slower) division operator, we
+    // want to convert 'beats per 60000ms' to 'beats per 65536ms',
+    // and then use a simple, fast bit-shift to divide by 65536.
+    //
+    // The ratio 65536:60000 is 279.620266667:256; we'll call it 280:256.
+    // The conversion is accurate to about 0.05%, more or less,
+    // e.g. if you ask for "120 BPM", you'll get about "119.93".
+    return (((GET_MILLIS()) - timebase) * beats_per_minute_88 * 280) >> 16;
+}
+
+/// beatsin88 generates a 16-bit sine wave at a given BPM,
+///           that oscillates within a given range.
+///           For this function, BPM MUST BE SPECIFIED as
+///           a Q8.8 fixed-point value; e.g. 120BPM must be
+///           specified as 120*256 = 30720.
+inline uint16_t mod_pixels_beatsin88(uint16_t beats_per_minute_88, uint16_t lowest, uint16_t highest,
+                              uint32_t timebase, uint16_t phase_offset) {
+    uint16_t beat = mod_pixels_beat88( beats_per_minute_88, timebase);
+    uint16_t beatsin = (mod_pixels_sin16( beat + phase_offset) + 32768);
+    uint16_t rangewidth = highest - lowest;
+    uint16_t scaledbeat = mod_pixels_scale16(beatsin, rangewidth);
+    uint16_t result = lowest + scaledbeat;
+    return result;
+}
 
 /**** END FASTLED CODE ****/
+
 
 #ifdef MICROPY_PY_PIXELS_SMALL_FUNCTIONS
 
@@ -534,6 +585,16 @@ STATIC mp_obj_t mod_pixels_noise16_(size_t n_args, const mp_obj_t *args) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_pixels_noise16_obj, 2, 2, mod_pixels_noise16_);
 
 #endif // MICROPY_PY_PIXELS_SMALL_FUNCTIONS
+
+
+STATIC mp_obj_t mod_pixels_beatsin_(size_t n_args, const mp_obj_t *args) {
+    uint16_t bpm     = mp_obj_get_float(args[0]) * 255.0f + 0.5f;
+    uint16_t lowest  = mp_obj_get_float(args[1]) * 65535.0f + 0.5f;
+    uint16_t highest = mp_obj_get_float(args[2]) * 65535.0f + 0.5f;
+    uint16_t result = mod_pixels_beatsin88(bpm, lowest, highest, 0, 0);
+    return mp_obj_new_float(result / 65536.0f);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_pixels_beatsin_obj, 3, 3, mod_pixels_beatsin_);
 
 
 STATIC mp_obj_t mod_pixels_fill_solid_(mp_obj_t buf, mp_obj_t color) {
@@ -921,6 +982,7 @@ STATIC const mp_rom_map_elem_t mp_module_pixels_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_color_from_palette), MP_ROM_PTR(&mod_pixels_color_from_palette_obj) },
     { MP_ROM_QSTR(MP_QSTR_noise16), MP_ROM_PTR(&mod_pixels_noise16_obj) },
 #endif
+    { MP_ROM_QSTR(MP_QSTR_beatsin), MP_ROM_PTR(&mod_pixels_beatsin_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_solid), MP_ROM_PTR(&mod_pixels_fill_solid_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_rainbow), MP_ROM_PTR(&mod_pixels_fill_rainbow_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_rainbow_array), MP_ROM_PTR(&mod_pixels_fill_rainbow_array_obj) },
