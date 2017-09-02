@@ -691,15 +691,22 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_pixels_array_fill_obj, mod_pixels_array_fil
 STATIC mp_obj_t mod_pixels_array_range_(mp_obj_t array, mp_obj_t start, mp_obj_t step) {
     mp_buffer_info_t arrayinfo;
     mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
-    uint32_t n = mp_obj_get_int(start);
-    uint32_t inc = mp_obj_get_int(step);
+    float n_f = mp_obj_get_float(start);
+    if (n_f > 1.0f || n_f < 0.0f) {
+        mp_raise_ValueError("start out of range");
+    }
+    float inc_f = mp_obj_get_float(step);
     if (arrayinfo.typecode == BYTEARRAY_TYPECODE || arrayinfo.typecode == 'B') {
+        uint32_t n = n_f * 255.0f + 0.5f;
+        uint32_t inc = inc_f * 255.0f + 0.5f;
         uint8_t *a = (uint8_t*)arrayinfo.buf;
         for (int i=0; i<arrayinfo.len; i++) {
             a[i] = n;
             n += inc;
         }
     } else if (arrayinfo.typecode == 'H') {
+        uint32_t n = n_f * 65535.0f + 0.5f;
+        uint32_t inc = inc_f * 65535.0f + 0.5f;
         uint16_t *a = (uint16_t*)arrayinfo.buf;
         for (int i=0; i<arrayinfo.len/2; i++) {
             a[i] = n;
