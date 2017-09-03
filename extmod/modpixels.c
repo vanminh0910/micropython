@@ -629,32 +629,80 @@ STATIC mp_obj_t mod_pixels_fill_rainbow_(mp_obj_t buf, mp_obj_t huestart, mp_obj
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(mod_pixels_fill_rainbow_obj, mod_pixels_fill_rainbow_);
 
 
-STATIC mp_obj_t mod_pixels_fill_rainbow_array_(mp_obj_t pixels, mp_obj_t array) {
-    mp_buffer_info_t pixelinfo, arrayinfo;
-    mp_get_buffer_raise(pixels, &pixelinfo, MP_BUFFER_WRITE);
-    mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_READ);
-    uint32_t *p = (uint32_t*)pixelinfo.buf;
-    size_t len = pixelinfo.len/4;
-    if (arrayinfo.typecode == BYTEARRAY_TYPECODE || arrayinfo.typecode == 'B') {
-        if (arrayinfo.len < len)
-            len = arrayinfo.len;
-        uint8_t *a = (uint8_t*)arrayinfo.buf;
-        for (int i=0; i<len; i++) {
-            p[i] = mod_pixels_hsv2rgb_rainbow(*a++, 255, 255);
+STATIC mp_obj_t mod_pixels_fill_rainbow_array_(const size_t n_args, const mp_obj_t *args) {
+    mp_buffer_info_t pixelinfo, huesinfo;
+    mp_get_buffer_raise(args[0], &pixelinfo, MP_BUFFER_WRITE);
+    mp_get_buffer_raise(args[1], &huesinfo, MP_BUFFER_READ);
+    uint32_t *pixels = (uint32_t*)pixelinfo.buf;
+
+    uint8_t *sats = NULL, *vals = NULL;
+    uint8_t sats_inc=1, vals_inc=1;
+    if (args[2] != mp_const_none) {
+        mp_buffer_info_t satsinfo;
+        mp_get_buffer_raise(args[2], &satsinfo, MP_BUFFER_READ);
+        sats = (uint8_t*)satsinfo.buf;
+        if (satsinfo.typecode == BYTEARRAY_TYPECODE || satsinfo.typecode == 'B') {
+            sats_inc = 1;
+        } else if (satsinfo.typecode == 'H') {
+            sats_inc = 2;
+            sats++; // works on little endian systems
+        } else {
+            mp_raise_ValueError("bad sats");
         }
-    } else if (arrayinfo.typecode == 'H') {
-        if (arrayinfo.len/2 < len)
-            len = arrayinfo.len/2;
-        uint16_t *a = (uint16_t*)arrayinfo.buf;
+    }
+    if (args[3] != mp_const_none) {
+        mp_buffer_info_t valsinfo;
+        mp_get_buffer_raise(args[3], &valsinfo, MP_BUFFER_READ);
+        vals = (uint8_t*)valsinfo.buf;
+        if (valsinfo.typecode == BYTEARRAY_TYPECODE || valsinfo.typecode == 'B') {
+            vals_inc = 1;
+        } else if (valsinfo.typecode == 'H') {
+            vals_inc = 2;
+            vals++; // works on little endian systems
+        } else {
+            mp_raise_ValueError("bad vals");
+        }
+    }
+    uint8_t sat=255, val=255;
+
+    size_t len = pixelinfo.len/4;
+    if (huesinfo.typecode == BYTEARRAY_TYPECODE || huesinfo.typecode == 'B') {
+        if (huesinfo.len < len)
+            len = huesinfo.len;
+        uint8_t *a = (uint8_t*)huesinfo.buf;
         for (int i=0; i<len; i++) {
-            p[i] = mod_pixels_hsv2rgb_rainbow(*a++ >> 8, 255, 255);
+            if (sats) {
+                sat = *sats;
+                sats += sats_inc;
+            }
+            if (vals) {
+                val = *vals;
+                vals += vals_inc;
+            }
+            pixels[i] = mod_pixels_hsv2rgb_rainbow(*a++, sat, val);
+        }
+    } else if (huesinfo.typecode == 'H') {
+        if (huesinfo.len/2 < len)
+            len = huesinfo.len/2;
+        uint16_t *a = (uint16_t*)huesinfo.buf;
+        for (int i=0; i<len; i++) {
+            if (sats) {
+                sat = *sats;
+                sats += sats_inc;
+            }
+            if (vals) {
+                val = *vals;
+                vals += vals_inc;
+            }
+            // TODO: 16-bit hue for greater color depth (is that visible?)
+            pixels[i] = mod_pixels_hsv2rgb_rainbow(*a++ >> 8, sat, val);
         }
     } else {
         mp_raise_ValueError("bad array");
     }
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_pixels_fill_rainbow_array_obj, mod_pixels_fill_rainbow_array_);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_pixels_fill_rainbow_array_obj, 4, 4, mod_pixels_fill_rainbow_array_);
 
 
 STATIC mp_obj_t mod_pixels_fill_palette_array_(const size_t n_args, const mp_obj_t *args) {
