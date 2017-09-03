@@ -935,7 +935,7 @@ STATIC bool mod_pixels_array_prepare_op(mp_buffer_info_t *arrayinfo, mp_buffer_i
 }
 
 
-STATIC mp_obj_t mod_pixels_array_add_(mp_obj_t array, mp_obj_t values) {
+STATIC mp_obj_t mod_pixels_array_add_array_(mp_obj_t array, mp_obj_t values) {
     mp_buffer_info_t arrayinfo, valuesinfo;
     mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
     mp_get_buffer_raise(values, &valuesinfo, MP_BUFFER_READ);
@@ -963,10 +963,40 @@ STATIC mp_obj_t mod_pixels_array_add_(mp_obj_t array, mp_obj_t values) {
     }
     return mp_const_none;
 }
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_pixels_array_add_array_obj, mod_pixels_array_add_array_);
+
+
+STATIC mp_obj_t mod_pixels_array_add_(mp_obj_t array, mp_obj_t value) {
+    mp_buffer_info_t arrayinfo;
+    mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
+    float val_f = mp_obj_get_float(value);
+    if (arrayinfo.typecode == BYTEARRAY_TYPECODE || arrayinfo.typecode == 'B') {
+        uint8_t *a = (uint8_t*)arrayinfo.buf;
+        int32_t val = val_f * 255.0 + 0.5;
+        for (size_t i=0; i<arrayinfo.len; i++) {
+            int32_t t = (int32_t)a[i] + val;
+            if (t > 0xff) t = 0xff;
+            if (t < 0) t = 0;
+            a[i] = t;
+        }
+    } else if (arrayinfo.typecode == 'H') {
+        uint16_t *a = (uint16_t*)arrayinfo.buf;
+        int32_t val = val_f * 65535.0 + 0.5;
+        for (size_t i=0; i<arrayinfo.len/2; i++) {
+            int32_t t = (int32_t)a[i] + val;
+            if (t > 0xffff) t = 0xffff;
+            if (t < 0) t = 0;
+            a[i] = t;
+        }
+    } else {
+        mp_raise_ValueError("bad buffer type");
+    }
+    return mp_const_none;
+}
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_pixels_array_add_obj, mod_pixels_array_add_);
 
 
-STATIC mp_obj_t mod_pixels_array_sub_(mp_obj_t array, mp_obj_t values) {
+STATIC mp_obj_t mod_pixels_array_sub_array_(mp_obj_t array, mp_obj_t values) {
     mp_buffer_info_t arrayinfo, valuesinfo;
     mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
     mp_get_buffer_raise(values, &valuesinfo, MP_BUFFER_READ);
@@ -994,7 +1024,76 @@ STATIC mp_obj_t mod_pixels_array_sub_(mp_obj_t array, mp_obj_t values) {
     }
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_pixels_array_sub_obj, mod_pixels_array_sub_);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_pixels_array_sub_array_obj, mod_pixels_array_sub_array_);
+
+
+STATIC mp_obj_t mod_pixels_array_mul_array_(mp_obj_t array, mp_obj_t values) {
+    mp_buffer_info_t arrayinfo, valuesinfo;
+    mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
+    mp_get_buffer_raise(values, &valuesinfo, MP_BUFFER_READ);
+    bool wide = mod_pixels_array_prepare_op(&arrayinfo, &valuesinfo);
+    size_t len = arrayinfo.len;
+    if (valuesinfo.len < len) {
+        len = valuesinfo.len;
+    }
+    if (wide) { // 16 bits
+        uint16_t *a = (uint16_t*)arrayinfo.buf;
+        uint16_t *v = (uint16_t*)valuesinfo.buf;
+        for (size_t i=0; i<len/2; i++) {
+            a[i] = (uint_fast32_t)a[i] * (uint_fast32_t)v[i] / 65536;
+        }
+    } else { // 8 bits
+        uint8_t *a = (uint8_t*)arrayinfo.buf;
+        uint8_t *v = (uint8_t*)valuesinfo.buf;
+        for (size_t i=0; i<len; i++) {
+            a[i] = (uint_fast16_t)a[i] * (uint_fast16_t)v[i] / 256;
+        }
+    }
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_pixels_array_mul_array_obj, mod_pixels_array_mul_array_);
+
+
+STATIC mp_obj_t mod_pixels_array_sin_(mp_obj_t array) {
+    mp_buffer_info_t arrayinfo;
+    mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
+    if (arrayinfo.typecode == BYTEARRAY_TYPECODE || arrayinfo.typecode == 'B') {
+        uint8_t *a = (uint8_t*)arrayinfo.buf;
+        for (size_t i=0; i<arrayinfo.len; i++) {
+            a[i] = (mod_pixels_sin16((uint16_t)a[i] << 8) + 32767) >> 8;
+        }
+    } else if (arrayinfo.typecode == 'H') {
+        uint16_t *a = (uint16_t*)arrayinfo.buf;
+        for (size_t i=0; i<arrayinfo.len/2; i++) {
+            a[i] = mod_pixels_sin16(a[i]) + 32767;
+        }
+    } else {
+        mp_raise_ValueError("bad buffer type");
+    }
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_pixels_array_sin_obj, mod_pixels_array_sin_);
+
+
+STATIC mp_obj_t mod_pixels_array_reverse_(mp_obj_t array) {
+    mp_buffer_info_t arrayinfo;
+    mp_get_buffer_raise(array, &arrayinfo, MP_BUFFER_WRITE);
+    if (arrayinfo.typecode == 'L') {
+        uint32_t *a = (uint32_t*)arrayinfo.buf;
+        size_t len = arrayinfo.len/4;
+        for (size_t i=0; i<len/2; i++) {
+            uint32_t j = len-i-1;
+            uint32_t tmp = a[i];
+            a[i] = a[j];
+            a[j] = tmp;
+        }
+    } else {
+        // unimplemented
+        mp_raise_ValueError("bad buffer type");
+    }
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_pixels_array_reverse_obj, mod_pixels_array_reverse_);
 
 
 STATIC mp_obj_t mod_pixels_array_copy_(mp_obj_t array, mp_obj_t values) {
@@ -1042,8 +1141,12 @@ STATIC const mp_rom_map_elem_t mp_module_pixels_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_array_range), MP_ROM_PTR(&mod_pixels_array_range_obj) },
     { MP_ROM_QSTR(MP_QSTR_array_fill_random), MP_ROM_PTR(&mod_pixels_array_fill_random_obj) },
     { MP_ROM_QSTR(MP_QSTR_array_fill_noise), MP_ROM_PTR(&mod_pixels_array_fill_noise_obj) },
+    { MP_ROM_QSTR(MP_QSTR_array_add_array), MP_ROM_PTR(&mod_pixels_array_add_array_obj) },
     { MP_ROM_QSTR(MP_QSTR_array_add), MP_ROM_PTR(&mod_pixels_array_add_obj) },
-    { MP_ROM_QSTR(MP_QSTR_array_sub), MP_ROM_PTR(&mod_pixels_array_sub_obj) },
+    { MP_ROM_QSTR(MP_QSTR_array_sub_array), MP_ROM_PTR(&mod_pixels_array_sub_array_obj) },
+    { MP_ROM_QSTR(MP_QSTR_array_mul_array), MP_ROM_PTR(&mod_pixels_array_mul_array_obj) },
+    { MP_ROM_QSTR(MP_QSTR_array_sin), MP_ROM_PTR(&mod_pixels_array_sin_obj) },
+    { MP_ROM_QSTR(MP_QSTR_array_reverse), MP_ROM_PTR(&mod_pixels_array_reverse_obj) },
     { MP_ROM_QSTR(MP_QSTR_array_copy), MP_ROM_PTR(&mod_pixels_array_copy_obj) },
 };
 
