@@ -8,6 +8,7 @@ from micropython import const
 
 RGB    = const(0xf210)
 GRB    = const(0xf120)
+GRBW   = const(0x0231)
 KHZ400 = const(0x10000)
 KHZ800 = const(0x00000)
 

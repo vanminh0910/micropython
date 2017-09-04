@@ -22,7 +22,7 @@
 void /*ICACHE_RAM_ATTR*/ esp_neopixel_write(uint8_t pin, uint32_t *pixels, uint32_t numBytes, uint32_t config) {
 
   uint32_t *p, *end, pix, mask;
-  uint32_t t, time0, time1, period, c, startTime, pinMask;
+  uint32_t t, time0, time1, period, c, startTime, startMask, pinMask;
 
   pinMask   = 1 << pin;
   p         =  pixels;
@@ -30,11 +30,19 @@ void /*ICACHE_RAM_ATTR*/ esp_neopixel_write(uint8_t pin, uint32_t *pixels, uint3
   pix       = 0;
   mask      = 0;
   startTime = 0;
+  startMask = 0x80000000;
 
   uint32_t fcpu = system_get_cpu_freq() * 1000000;
-  uint32_t rIndex = ((config & 0x0f00) >> 8) * 8;
-  uint32_t gIndex = ((config & 0x00f0) >> 4) * 8;
-  uint32_t bIndex = ((config & 0x000f) >> 0) * 8;
+  uint32_t wIndex = ((config & 0xf000) >> 12) * 8;
+  uint32_t rIndex = ((config & 0x0f00) >> 8)  * 8;
+  uint32_t gIndex = ((config & 0x00f0) >> 4)  * 8;
+  uint32_t bIndex = ((config & 0x000f) >> 0)  * 8;
+
+  if ((config & 0xf000) == 0xf000) {
+    // disable white
+    wIndex = 24;
+    startMask = 0x800000;
+  }
 
 #ifdef NEO_KHZ400
   if((config & NEO_VARIANT) == NEO_VARIANT_800) {
@@ -54,12 +62,12 @@ void /*ICACHE_RAM_ATTR*/ esp_neopixel_write(uint8_t pin, uint32_t *pixels, uint3
   for(t = time0;; t = time0) {
     if(!mask) {                                           // Next bit/byte
       if(p >= end) break;
-      pix  = *p++;
-      // TODO white
-      pix = ((pix & 0xff0000) >> 16 << rIndex) |
-            ((pix & 0x00ff00) >>  8 << gIndex) |
-            ((pix & 0x0000ff) >>  0 << bIndex);
-      mask = 0x800000;
+      pix = *p++;
+      pix = ((pix & 0xff000000) >> 24 << wIndex) |
+            ((pix & 0x00ff0000) >> 16 << rIndex) |
+            ((pix & 0x0000ff00) >>  8 << gIndex) |
+            ((pix & 0x000000ff) >>  0 << bIndex);
+      mask = startMask;
     }
     if(pix & mask) t = time1;                             // Bit high duration
     while(((c = mp_hal_ticks_cpu()) - startTime) < period); // Wait for bit start
