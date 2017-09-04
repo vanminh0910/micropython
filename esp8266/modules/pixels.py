@@ -179,9 +179,9 @@ class Array:
         Array.
         '''
         if isinstance(value, Array):
-            _pixels.array_add_array(self.buf, value.buf)
+            _pixels.array_sub_array(self.buf, value.buf)
         else:
-            _pixels.array_add(self.buf, 1-value)
+            _pixels.array_add(self.buf, -value)
         return self
 
     def __iadd__(self, value):
