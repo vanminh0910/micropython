@@ -576,13 +576,13 @@ STATIC mp_obj_t mod_pixels_color_from_palette_(mp_obj_t palette, mp_obj_t index,
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(mod_pixels_color_from_palette_obj, mod_pixels_color_from_palette_);
 
 
-STATIC mp_obj_t mod_pixels_noise16_(size_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t mod_pixels_noise_(size_t n_args, const mp_obj_t *args) {
     uint32_t x = mp_obj_get_float(args[0]) * 65535.0f + 0.5f;
     uint32_t y = mp_obj_get_float(args[1]) * 65535.0f + 0.5f;
     uint16_t result = mod_pixels_inoise16(x, y);
-    return mp_obj_new_int(result);
+    return mp_obj_new_float(result / 65535.0f);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_pixels_noise16_obj, 2, 2, mod_pixels_noise16_);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_pixels_noise_obj, 2, 2, mod_pixels_noise_);
 
 #endif // MICROPY_PY_PIXELS_SMALL_FUNCTIONS
 
@@ -1127,7 +1127,7 @@ STATIC const mp_rom_map_elem_t mp_module_pixels_globals_table[] = {
 #ifdef MICROPY_PY_PIXELS_SMALL_FUNCTIONS
     { MP_ROM_QSTR(MP_QSTR_hsv2rgb_rainbow), MP_ROM_PTR(&mod_pixels_hsv2rgb_rainbow_obj) },
     { MP_ROM_QSTR(MP_QSTR_color_from_palette), MP_ROM_PTR(&mod_pixels_color_from_palette_obj) },
-    { MP_ROM_QSTR(MP_QSTR_noise16), MP_ROM_PTR(&mod_pixels_noise16_obj) },
+    { MP_ROM_QSTR(MP_QSTR_noise), MP_ROM_PTR(&mod_pixels_noise_obj) },
 #endif
     { MP_ROM_QSTR(MP_QSTR_beatsin), MP_ROM_PTR(&mod_pixels_beatsin_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_solid), MP_ROM_PTR(&mod_pixels_fill_solid_obj) },
