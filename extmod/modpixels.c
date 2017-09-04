@@ -555,7 +555,7 @@ STATIC mp_obj_t mod_pixels_beatsin_(size_t n_args, const mp_obj_t *args) {
     uint16_t lowest  = mp_obj_get_float(args[1]) * 65535.0f + 0.5f;
     uint16_t highest = mp_obj_get_float(args[2]) * 65535.0f + 0.5f;
     uint16_t result = mod_pixels_beatsin88(bpm, lowest, highest, 0, 0);
-    return mp_obj_new_float(result / 65536.0f);
+    return mp_obj_new_float(result / 65535.0f);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_pixels_beatsin_obj, 3, 3, mod_pixels_beatsin_);
 
