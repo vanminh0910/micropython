@@ -30,9 +30,10 @@
 #include "py/stream.h"
 #include "py/binary.h"
 #include "py/mphal.h" // mp_hal_ticks_ms
-#include "etshal.h"   // WDEV_HWRNG on the ESP8266
 
 #if MICROPY_PY_PIXELS
+
+#include "etshal.h"   // WDEV_HWRNG on the ESP8266
 
 //#define MICROPY_PY_PIXELS_SMALL_FUNCTIONS
 
