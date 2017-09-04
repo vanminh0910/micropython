@@ -43,11 +43,11 @@
 #define K170 170
 #define K85  85
 
-int mod_pixels_scale8(int i, int frac) {
+static int mod_pixels_scale8(int i, int frac) {
     return (i * (1+frac)) >> 8;
 }
 
-uint16_t mod_pixels_scale16(uint16_t i, uint32_t scale) {
+static uint16_t mod_pixels_scale16(uint16_t i, uint32_t scale) {
     return ((uint32_t)(i) * (1+scale)) / 65536;
 }
 
@@ -56,7 +56,7 @@ uint16_t mod_pixels_scale16(uint16_t i, uint32_t scale) {
 ///  inputs are non-zero, the output is guaranteed to be non-zero.
 ///  This makes for better 'video'/LED dimming, at the cost of
 ///  several additional cycles.
-uint8_t mod_pixels_scale8_video(int i, int scale) {
+static uint8_t mod_pixels_scale8_video(int i, int scale) {
     uint8_t j = ((i * scale) >> 8) + ((i && scale) ? 1 : 0);
     // uint8_t nonzeroscale = (scale != 0) ? 1 : 0;
     // uint8_t j = (i == 0) ? 0 : (((int)i * (int)(scale) ) >> 8) + nonzeroscale;
@@ -64,7 +64,7 @@ uint8_t mod_pixels_scale8_video(int i, int scale) {
 }
 
 
-uint32_t mod_pixels_hsv2rgb_rainbow(uint8_t hue, uint8_t sat, uint8_t val) {
+static uint32_t mod_pixels_hsv2rgb_rainbow(uint8_t hue, uint8_t sat, uint8_t val) {
     // Yellow has a higher inherent brightness than
     // any other color; 'pure' yellow is perceived to
     // be 93% as bright as white.  In order to make
@@ -226,7 +226,7 @@ uint32_t mod_pixels_hsv2rgb_rainbow(uint8_t hue, uint8_t sat, uint8_t val) {
     return r << 16 | g << 8 | b;
 }
 
-uint32_t mod_pixels_color_from_palette(uint32_t *pal, uint16_t index, uint8_t brightness) {
+static uint32_t mod_pixels_color_from_palette(uint32_t *pal, uint16_t index, uint8_t brightness) {
     // Count the number of bits in `len`. Unfortunately, this is a pretty
     // expensive operation (costing 48%) so it's disabled.
     //uint32_t bits = mod_pixels_nbits(len);
@@ -293,7 +293,7 @@ uint32_t mod_pixels_color_from_palette(uint32_t *pal, uint16_t index, uint8_t br
 
 /// linear interpolation between two signed 15-bit values,
 /// with 8-bit fraction
-int16_t mod_pixels_lerp15by16(int16_t a, int16_t b, uint16_t frac) {
+static int16_t mod_pixels_lerp15by16(int16_t a, int16_t b, uint16_t frac) {
     int16_t result;
     if( b > a) {
         uint16_t delta = b - a;
@@ -307,7 +307,7 @@ int16_t mod_pixels_lerp15by16(int16_t a, int16_t b, uint16_t frac) {
     return result;
 }
 
-static int8_t inline __attribute__((always_inline)) mod_pixels_lerp7by8(int8_t a, int8_t b, uint8_t frac) {
+static int8_t inline mod_pixels_lerp7by8(int8_t a, int8_t b, uint8_t frac) {
     // int8_t delta = b - a;
     // int16_t prod = (uint16_t)delta * (uint16_t)frac;
     // int8_t scaled = prod >> 8;
@@ -331,7 +331,7 @@ static int8_t inline __attribute__((always_inline)) mod_pixels_lerp7by8(int8_t a
 ///       integers (int16_t)
 ///       If the first argument is even, result is rounded down.
 ///       If the first argument is odd, result is result up.
-int16_t mod_pixels_avg15(int16_t i, int16_t j) {
+static int16_t mod_pixels_avg15(int16_t i, int16_t j) {
     return ((int32_t)((int32_t)(i) + (int32_t)(j)) >> 1) + (i & 0x1);
 }
 
@@ -339,11 +339,11 @@ int16_t mod_pixels_avg15(int16_t i, int16_t j) {
 ///       integers (int8_t)
 ///       If the first argument is even, result is rounded down.
 ///       If the first argument is odd, result is result up.
-int8_t mod_pixels_avg7(int8_t i, int8_t j) {
+static int8_t mod_pixels_avg7(int8_t i, int8_t j) {
     return ((i + j) >> 1) + (i & 0x1);
 }
 
-static int16_t inline __attribute__((always_inline)) mod_pixels_grad16(uint8_t hash, int16_t x, int16_t y) {
+static int16_t inline mod_pixels_grad16(uint8_t hash, int16_t x, int16_t y) {
   hash = hash & 7;
   int16_t u,v;
   if(hash < 4) { u = x; v = y; } else { u = y; v = x; }
@@ -353,7 +353,7 @@ static int16_t inline __attribute__((always_inline)) mod_pixels_grad16(uint8_t h
   return mod_pixels_avg15(u,v);
 }
 
-static int8_t inline __attribute__((always_inline)) mod_pixels_grad8(uint8_t hash, int8_t x, int8_t y) {
+static int8_t inline mod_pixels_grad8(uint8_t hash, int8_t x, int8_t y) {
   // since the tests below can be done bit-wise on the bottom
   // three bits, there's no need to mask off the higher bits
   //  hash = hash & 7;
@@ -393,7 +393,7 @@ static uint8_t const mod_pixels_noise_p[] = { 151,160,137,91,90,15,
 #define LERP(a,b,u) mod_pixels_lerp15by16(a,b,u)
 
 
-int16_t mod_pixels_inoise16_raw(uint32_t x, uint32_t y) {
+static int16_t mod_pixels_inoise16_raw(uint32_t x, uint32_t y) {
   // Find the unit cube containing the point
   uint8_t X = x>>16;
   uint8_t Y = y>>16;
@@ -425,7 +425,7 @@ int16_t mod_pixels_inoise16_raw(uint32_t x, uint32_t y) {
   return ans;
 }
 
-uint16_t mod_pixels_inoise16(uint32_t x, uint32_t y) {
+static uint16_t mod_pixels_inoise16(uint32_t x, uint32_t y) {
   int32_t ans = mod_pixels_inoise16_raw(x,y);
   ans = ans + 17308L;
   uint32_t pan = ans;
@@ -440,44 +440,6 @@ uint16_t mod_pixels_inoise16(uint32_t x, uint32_t y) {
   // return scale16by8(inoise16_raw(x,y)+17308,242)<<1;
 }
 
-int8_t inoise8_raw(uint16_t x, uint16_t y) {
-  // Find the unit cube containing the point
-  uint8_t X = x>>8;
-  uint8_t Y = y>>8;
-
-  // Hash cube corner coordinates
-  uint8_t A = P(X)+Y;
-  uint8_t AA = P(A);
-  uint8_t AB = P(A+1);
-  uint8_t B = P(X+1)+Y;
-  uint8_t BA = P(B);
-  uint8_t BB = P(B+1);
-
-  // Get the relative position of the point in the cube
-  uint8_t u = x;
-  uint8_t v = y;
-
-  // Get a signed version of the above for the grad function
-  int8_t xx = ((uint8_t)(x)>>1) & 0x7F;
-  int8_t yy = ((uint8_t)(y)>>1) & 0x7F;
-  uint8_t N = 0x80;
-
-  // u = FADE(u); v = FADE(v); w = FADE(w);
-  u = mod_pixels_scale8(u,u); v = mod_pixels_scale8(v,v);
-
-  int8_t X1 = mod_pixels_lerp7by8(mod_pixels_grad8(P(AA), xx, yy), mod_pixels_grad8(P(BA), xx - N, yy), u);
-  int8_t X2 = mod_pixels_lerp7by8(mod_pixels_grad8(P(AB), xx, yy-N), mod_pixels_grad8(P(BB), xx - N, yy - N), u);
-
-  int8_t ans = mod_pixels_lerp7by8(X1,X2,v);
-
-  return ans;
-  // return scale8((70+(ans)),234)<<1;
-}
-
-uint8_t mod_pixels_inoise8(uint16_t x, uint16_t y) {
-  return mod_pixels_scale8(69+inoise8_raw(x,y),237)<<1;
-}
-
 /// Fast 16-bit approximation of sin(x). This approximation never varies more than
 /// 0.69% from the floating point value you'd get by doing
 ///
@@ -485,7 +447,7 @@ uint8_t mod_pixels_inoise8(uint16_t x, uint16_t y) {
 ///
 /// @param theta input angle from 0-65535
 /// @returns sin of theta, value between -32767 to 32767.
-int16_t mod_pixels_sin16(uint16_t theta) {
+static int16_t mod_pixels_sin16(uint16_t theta) {
     static const uint16_t base[] =
     { 0, 6393, 12539, 18204, 23170, 27245, 30273, 32137 };
     static const uint8_t slope[] =
@@ -518,7 +480,7 @@ int16_t mod_pixels_sin16(uint16_t theta) {
 ///        for this function, 120 BPM MUST BE specified as
 ///        120*256 = 30720.
 ///        If you just want to specify "120", use beat16 or beat8.
-inline uint16_t mod_pixels_beat88(uint16_t beats_per_minute_88, uint32_t timebase) {
+static inline uint16_t mod_pixels_beat88(uint16_t beats_per_minute_88, uint32_t timebase) {
     // BPM is 'beats per minute', or 'beats per 60000ms'.
     // To avoid using the (slower) division operator, we
     // want to convert 'beats per 60000ms' to 'beats per 65536ms',
@@ -535,7 +497,7 @@ inline uint16_t mod_pixels_beat88(uint16_t beats_per_minute_88, uint32_t timebas
 ///           For this function, BPM MUST BE SPECIFIED as
 ///           a Q8.8 fixed-point value; e.g. 120BPM must be
 ///           specified as 120*256 = 30720.
-inline uint16_t mod_pixels_beatsin88(uint16_t beats_per_minute_88, uint16_t lowest, uint16_t highest,
+static inline uint16_t mod_pixels_beatsin88(uint16_t beats_per_minute_88, uint16_t lowest, uint16_t highest,
                               uint32_t timebase, uint16_t phase_offset) {
     uint16_t beat = mod_pixels_beat88( beats_per_minute_88, timebase);
     uint16_t beatsin = (mod_pixels_sin16( beat + phase_offset) + 32768);
