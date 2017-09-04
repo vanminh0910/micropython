@@ -935,18 +935,18 @@ STATIC mp_obj_t mod_pixels_array_add_(mp_obj_t array, mp_obj_t value) {
     float val_f = mp_obj_get_float(value);
     if (arrayinfo.typecode == BYTEARRAY_TYPECODE || arrayinfo.typecode == 'B') {
         uint8_t *a = (uint8_t*)arrayinfo.buf;
-        int32_t val = val_f * 255.0 + 0.5;
+        int_fast16_t val = val_f * 255.0 + 0.5;
         for (size_t i=0; i<arrayinfo.len; i++) {
-            int32_t t = (int32_t)a[i] + val;
+            int_fast16_t t = (int_fast16_t)a[i] + val;
             if (t > 0xff) t = 0xff;
             if (t < 0) t = 0;
             a[i] = t;
         }
     } else if (arrayinfo.typecode == 'H') {
         uint16_t *a = (uint16_t*)arrayinfo.buf;
-        int32_t val = val_f * 65535.0 + 0.5;
+        int_fast32_t val = val_f * 65535.0 + 0.5;
         for (size_t i=0; i<arrayinfo.len/2; i++) {
-            int32_t t = (int32_t)a[i] + val;
+            int_fast32_t t = (int_fast32_t)a[i] + val;
             if (t > 0xffff) t = 0xffff;
             if (t < 0) t = 0;
             a[i] = t;
