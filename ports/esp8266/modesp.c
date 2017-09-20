@@ -303,7 +303,7 @@ void *esp_native_code_commit(void *buf, size_t len) {
         dest = (void*)esp_native_code_cur;
         memcpy(dest, buf, len);
     } else {
-        SpiFlashOpResult res;
+        SpiFlashOpResult res = SPI_FLASH_RESULT_OK;
         while (esp_native_code_erased < esp_native_code_cur + len) {
             res = spi_flash_erase_sector(esp_native_code_erased / FLASH_SEC_SIZE);
             if (res != SPI_FLASH_RESULT_OK) {

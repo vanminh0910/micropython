@@ -442,7 +442,7 @@ mp_obj_t mp_stream_unbuffered_iter(mp_obj_t self) {
     return MP_OBJ_STOP_ITERATION;
 }
 
-STATIC mp_obj_t stream_seek(size_t n_args, const mp_obj_t *args) {
+mp_obj_t mp_stream_seek(size_t n_args, const mp_obj_t *args) {
     const mp_stream_p_t *stream_p = mp_get_stream_raise(args[0], MP_STREAM_OP_IOCTL);
 
     struct mp_stream_seek_t seek_s;
@@ -467,13 +467,13 @@ STATIC mp_obj_t stream_seek(size_t n_args, const mp_obj_t *args) {
     // TODO: Could be uint64
     return mp_obj_new_int_from_uint(seek_s.offset);
 }
-MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_stream_seek_obj, 2, 3, stream_seek);
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_stream_seek_obj, 2, 3, mp_stream_seek);
 
 STATIC mp_obj_t stream_tell(mp_obj_t self) {
     mp_obj_t offset = MP_OBJ_NEW_SMALL_INT(0);
     mp_obj_t whence = MP_OBJ_NEW_SMALL_INT(SEEK_CUR);
     const mp_obj_t args[3] = {self, offset, whence};
-    return stream_seek(3, args);
+    return mp_stream_seek(3, args);
 }
 MP_DEFINE_CONST_FUN_OBJ_1(mp_stream_tell_obj, stream_tell);
 

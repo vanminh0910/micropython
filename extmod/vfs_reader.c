@@ -63,6 +63,19 @@ STATIC mp_uint_t mp_reader_vfs_readbyte(void *data) {
     return reader->buf[reader->pos++];
 }
 
+STATIC mp_int_t mp_reader_vfs_seek(void *data, mp_int_t pos) {
+    mp_reader_vfs_t *reader = (mp_reader_vfs_t*)data;
+    const mp_obj_t args[2] = {reader->file, mp_obj_new_int(pos)};
+    mp_obj_t new_offset = mp_stream_seek(2, args);
+    int errcode;
+    reader->len = mp_stream_rw(reader->file, reader->buf, sizeof(reader->buf), &errcode, MP_STREAM_RW_READ | MP_STREAM_RW_ONCE);
+    if (errcode != 0) {
+        mp_raise_OSError(errcode);
+    }
+    reader->pos = 0;
+    return mp_obj_get_int(new_offset);
+}
+
 STATIC void mp_reader_vfs_close(void *data) {
     mp_reader_vfs_t *reader = (mp_reader_vfs_t*)data;
     mp_stream_close(reader->file);
@@ -81,6 +94,7 @@ void mp_reader_new_file(mp_reader_t *reader, const char *filename) {
     rf->pos = 0;
     reader->data = rf;
     reader->readbyte = mp_reader_vfs_readbyte;
+    reader->seek = mp_reader_vfs_seek;
     reader->close = mp_reader_vfs_close;
 }
 

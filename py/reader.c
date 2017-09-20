@@ -47,6 +47,15 @@ STATIC mp_uint_t mp_reader_mem_readbyte(void *data) {
     }
 }
 
+STATIC mp_int_t mp_reader_mem_seek(void *data, mp_int_t pos) {
+    mp_reader_mem_t *reader = (mp_reader_mem_t*)data;
+    if (reader->beg + pos > reader->end) {
+        return MP_READER_EOF;
+    }
+    reader->cur = reader->beg + pos;
+    return reader->end - reader->beg;
+}
+
 STATIC void mp_reader_mem_close(void *data) {
     mp_reader_mem_t *reader = (mp_reader_mem_t*)data;
     if (reader->free_len > 0) {
@@ -63,6 +72,7 @@ void mp_reader_new_mem(mp_reader_t *reader, const byte *buf, size_t len, size_t 
     rm->end = buf + len;
     reader->data = rm;
     reader->readbyte = mp_reader_mem_readbyte;
+    reader->seek = mp_reader_mem_seek;
     reader->close = mp_reader_mem_close;
 }
 
@@ -98,6 +108,20 @@ STATIC mp_uint_t mp_reader_posix_readbyte(void *data) {
     return reader->buf[reader->pos++];
 }
 
+STATIC mp_int_t mp_reader_posix_seek(void *data, mp_int_t pos) {
+    mp_reader_posix_t *reader = (mp_reader_posix_t*)data;
+    if (lseek(reader->fd, pos, SEEK_SET) == -1) {
+        return MP_READER_EOF;
+    }
+    int n = read(reader->fd, reader->buf, sizeof(reader->buf));
+    if (n == -1) {
+        mp_raise_OSError(errno);
+    }
+    reader->len = n;
+    reader->pos = 0;
+    return reader->pos;
+}
+
 STATIC void mp_reader_posix_close(void *data) {
     mp_reader_posix_t *reader = (mp_reader_posix_t*)data;
     if (reader->close_fd) {
@@ -121,6 +145,7 @@ void mp_reader_new_file_from_fd(mp_reader_t *reader, int fd, bool close_fd) {
     rp->pos = 0;
     reader->data = rp;
     reader->readbyte = mp_reader_posix_readbyte;
+    reader->seek = mp_reader_posix_seek;
     reader->close = mp_reader_posix_close;
 }
 

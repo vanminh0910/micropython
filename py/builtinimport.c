@@ -36,6 +36,7 @@
 #include "py/runtime.h"
 #include "py/builtin.h"
 #include "py/frozenmod.h"
+#include "py/elf.h"
 
 #if MICROPY_DEBUG_VERBOSE // print debugging info
 #define DEBUG_PRINT (1)
@@ -91,7 +92,18 @@ STATIC mp_import_stat_t stat_dir_or_file(vstr_t *path) {
 
     // not a directory, add .py and try as a file
     vstr_add_str(path, ".py");
+    stat = stat_file_py_or_mpy(path);
+
+    #if MICROPY_MODULE_ELF
+    if (stat == MP_IMPORT_STAT_FILE) {
+        return stat;
+    }
+    vstr_cut_tail_bytes(path, 4); // TODO .py vs .mpy
+    vstr_add_str(path, ".so");
     return stat_file_py_or_mpy(path);
+    #else
+    return stat;
+    #endif
 }
 
 STATIC mp_import_stat_t find_file(const char *file_str, uint file_len, vstr_t *dest) {
@@ -216,6 +228,14 @@ STATIC void do_load(mp_obj_t module_obj, vstr_t *file) {
     if (file_str[file->len - 3] == 'm') {
         mp_raw_code_t *raw_code = mp_raw_code_load_file(file_str);
         do_execute_raw_code(module_obj, raw_code);
+        return;
+    }
+    #endif
+
+    #if MICROPY_MODULE_ELF
+    if (file_str[file->len - 2] == 's') {
+        mp_store_attr(module_obj, MP_QSTR___path__, mp_obj_new_str(file->buf, file->len, false));
+        mp_elf_load_file(module_obj, file_str);
         return;
     }
     #endif

@@ -30,6 +30,7 @@
 #if MICROPY_ENABLE_COMPILER
 
 typedef struct _mp_lexer_str32_buf_t {
+    const uint32_t *src_start;
     const uint32_t *src_cur;
     uint32_t val;
     uint8_t byte_off;
@@ -52,6 +53,16 @@ STATIC mp_uint_t str32_buf_next_byte(void *sb_in) {
     return c;
 }
 
+STATIC mp_int_t str32_buf_seek(void *sb_in, mp_int_t offset) {
+    // TODO untested
+    mp_lexer_str32_buf_t *sb = (mp_lexer_str32_buf_t*)sb_in;
+    const uint32_t *str = (uint32_t*)(((uint8_t*)sb->src_start));
+    sb->byte_off = (uint32_t)str & 3;
+    sb->src_cur = (uint32_t*)(str - sb->byte_off);
+    sb->val = *sb->src_cur++ >> sb->byte_off * 8;
+    return offset;
+}
+
 STATIC void str32_buf_free(void *sb_in) {
     mp_lexer_str32_buf_t *sb = (mp_lexer_str32_buf_t*)sb_in;
     m_del_obj(mp_lexer_str32_buf_t, sb);
@@ -59,10 +70,11 @@ STATIC void str32_buf_free(void *sb_in) {
 
 mp_lexer_t *mp_lexer_new_from_str32(qstr src_name, const char *str, mp_uint_t len, mp_uint_t free_len) {
     mp_lexer_str32_buf_t *sb = m_new_obj(mp_lexer_str32_buf_t);
+    sb->src_start = (uint32_t*)str;
     sb->byte_off = (uint32_t)str & 3;
     sb->src_cur = (uint32_t*)(str - sb->byte_off);
     sb->val = *sb->src_cur++ >> sb->byte_off * 8;
-    mp_reader_t reader = {sb, str32_buf_next_byte, str32_buf_free};
+    mp_reader_t reader = {sb, str32_buf_next_byte, str32_buf_seek, str32_buf_free};
     return mp_lexer_new(src_name, reader);
 }
 

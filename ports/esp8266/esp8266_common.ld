@@ -81,6 +81,7 @@ SECTIONS
         *py/binary.o*(.literal* .text*)
         *py/builtin*.o*(.literal* .text*)
         *py/compile.o*(.literal* .text*)
+        *py/elf.o*(.literal* .text*)
         *py/emit*.o*(.literal* .text*)
         *py/persistentcode*.o*(.literal* .text*)
         *py/formatfloat.o*(.literal* .text*)

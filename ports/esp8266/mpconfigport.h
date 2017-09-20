@@ -97,6 +97,7 @@
 #define MICROPY_MODULE_FROZEN_STR   (1)
 #define MICROPY_MODULE_FROZEN_MPY   (1)
 #define MICROPY_MODULE_FROZEN_LEXER mp_lexer_new_from_str32
+//#define MICROPY_MODULE_ELF          (1)
 #define MICROPY_QSTR_EXTRA_POOL     mp_qstr_frozen_const_pool
 
 #define MICROPY_VFS                    (1)

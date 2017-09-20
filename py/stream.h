@@ -80,6 +80,7 @@ MP_DECLARE_CONST_FUN_OBJ_VAR_BETWEEN(mp_stream_ioctl_obj);
 #define MP_STREAM_OP_IOCTL (4)
 
 const mp_stream_p_t *mp_get_stream_raise(mp_obj_t self_in, int flags);
+mp_obj_t mp_stream_seek(size_t n_args, const mp_obj_t *args);
 mp_obj_t mp_stream_close(mp_obj_t stream);
 
 // Iterator which uses mp_stream_unbuffered_readline_obj

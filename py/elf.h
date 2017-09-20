@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013-2016 Damien P. George
+ * Copyright (c) 2017 Ayke van Laethem
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,25 +23,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MICROPY_INCLUDED_PY_READER_H
-#define MICROPY_INCLUDED_PY_READER_H
+
+#ifdef MICROPY_MODULE_ELF
+#ifndef MICROPY_INCLUDED_PY_ELF_H
+#define MICROPY_INCLUDED_PY_ELF_H
 
 #include "py/obj.h"
 
-// the readbyte function must return the next byte in the input stream
-// it must return MP_READER_EOF if end of stream
-// it can be called again after returning MP_READER_EOF, and in that case must return MP_READER_EOF
-#define MP_READER_EOF ((mp_uint_t)(-1))
+void mp_elf_load_file(mp_obj_t module_obj, char *file_str);
 
-typedef struct _mp_reader_t {
-    void *data;
-    mp_uint_t (*readbyte)(void *data);
-    mp_int_t (*seek)(void *data, mp_int_t pos);
-    void (*close)(void *data);
-} mp_reader_t;
+typedef mp_obj_t (*mp_fun_var_t)(size_t n, const mp_obj_t *);
 
-void mp_reader_new_mem(mp_reader_t *reader, const byte *buf, size_t len, size_t free_len);
-void mp_reader_new_file(mp_reader_t *reader, const char *filename);
-void mp_reader_new_file_from_fd(mp_reader_t *reader, int fd, bool close_fd);
+typedef int (*mp_fun_elf_2_int_t)(int, int);
+typedef mp_obj_t (*mp_fun_elf_var_t)(size_t n_args, const mp_obj_t *args);
 
-#endif // MICROPY_INCLUDED_PY_READER_H
+extern const mp_obj_type_t mp_type_fun_elf_2;
+extern const mp_obj_type_t mp_type_fun_elf_var;
+
+typedef struct _mp_obj_fun_elf_t {
+    mp_obj_base_t base;
+    union {
+        mp_fun_elf_2_int_t _2;
+        mp_fun_elf_var_t _var;
+    } fun;
+} mp_obj_fun_elf_t ;
+
+#endif // MICROPY_INCLUDED_PY_ELF_H
+#endif // MICROPY_MODULE_ELF
