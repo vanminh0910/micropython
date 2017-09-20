@@ -27,6 +27,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include "py/nlr.h"
 #include "py/objtuple.h"
@@ -571,3 +572,91 @@ mp_obj_t mp_obj_new_fun_asm(size_t n_args, void *fun_data, mp_uint_t type_sig) {
 }
 
 #endif // MICROPY_EMIT_INLINE_ASM
+
+typedef mp_obj_t (*mp_fun_loadable_module)(const mp_obj_t arg);
+
+extern const mp_obj_type_t mp_type_fun_loadable_module;
+
+typedef struct _mp_obj_fun_loadable_module_t {
+    mp_obj_base_t base;
+    mp_fun_loadable_module fun;
+} mp_obj_fun_loadable_module_t;
+
+
+STATIC mp_obj_t fun_loadable_module_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+    assert(MP_OBJ_IS_TYPE(self_in, &mp_type_fun_loadable_module));
+    mp_obj_fun_loadable_module_t *self = MP_OBJ_TO_PTR(self_in);
+    mp_arg_check_num(n_args, n_kw, 0, 0, false);
+    mp_obj_t locals = mp_locals_get();
+    printf("locals: %p\n", locals);
+    printf("executing...\n");
+    mp_obj_t result = self->fun(locals);
+    printf("done.\n");
+    printf("result:  %p\n", result);
+    //printf("result: %08x\n", *(uint32_t*)result);
+    printf("none:    %p\n", mp_const_none);
+    printf("false:   %p\n", mp_const_false);
+    printf("type:    %p\n", &mp_type_type);
+    printf("fun_2:   %p\n", &mp_type_fun_builtin_2);
+    //if (qstr_str((qstr)result)) {
+    //    printf("qstr:  %s\n", qstr_str((qstr)result));
+    //}
+    if (mp_obj_is_integer(result)) {
+        printf("result:  %d\n", (int)mp_obj_get_int(result));
+    } else if (mp_obj_is_callable(result)) {
+        printf("result:  callable\n");
+        const mp_obj_base_t *o = MP_OBJ_TO_PTR(result);
+        printf("o:       %p\n", o);
+        printf("o->type: %p\n", o->type);
+    } else {
+        printf("result:  <not an int>\n");
+    }
+    return mp_const_none;
+}
+
+const mp_obj_type_t mp_type_fun_loadable_module = {
+    { &mp_type_type },
+    .name = MP_QSTR_function,
+    .call = fun_loadable_module_call,
+    .unary_op = mp_generic_unary_op,
+};
+
+
+mp_obj_t mp_obj_new_fun_loadable_native(size_t n_args, byte *data, size_t len, size_t module_init_index) {
+    // TODO move to MP_PLAT_COMMIT_EXEC
+    //#if defined(__linux__)
+    // https://stackoverflow.com/a/39868486/559350
+    //long pagesize = sysconf(_SC_PAGE_SIZE);
+    //long page_no = (long)data/pagesize;
+    // Unfortunately we have to keep the page writable, otherwise further
+    // m_new calls will fail...
+    /*int res = mprotect((void*)(page_no*pagesize), len, PROT_EXEC|PROT_READ|PROT_WRITE);
+    if (res) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_RuntimeError,
+            "mprotect: %s", strerror(errno)));
+    }*/
+
+    #if defined(MP_PLAT_COMMIT_EXEC)
+    byte *data_exec = MP_PLAT_COMMIT_EXEC(data, len);
+    if (data_exec != data) {
+        //m_free(data); // TODO
+    }
+    // TODO check previously calculated address
+    //if (data_exec != foo) {
+    //    mp_raise_msg(&mp_type_RuntimeError, NULL);
+    //}
+    #else
+    byte *data_exec = data;
+    #endif
+
+    mp_obj_fun_loadable_module_t *funobj = m_new(mp_obj_fun_loadable_module_t, 1);
+    funobj->base.type = &mp_type_fun_loadable_module;
+    funobj->fun = (void*)&data_exec[module_init_index];
+    printf("module_init_index: %d\n", (int)module_init_index);
+    printf("data_exec:\n");
+    for (int i=0; i<0x18; i++) {
+        printf(" %02x", data_exec[i]);
+    }
+    printf("\n");
+    return funobj;
+}

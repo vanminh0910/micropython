@@ -37,6 +37,7 @@ typedef enum {
     MP_CODE_NATIVE_PY,
     MP_CODE_NATIVE_VIPER,
     MP_CODE_NATIVE_ASM,
+    MP_CODE_NATIVE_LOADABLE,
 } mp_raw_code_kind_t;
 
 typedef struct _mp_raw_code_t {
@@ -58,6 +59,11 @@ typedef struct _mp_raw_code_t {
             const mp_uint_t *const_table;
             mp_uint_t type_sig; // for viper, compressed as 2-bit types; ret is MSB, then arg0, arg1, etc
         } u_native;
+        struct {
+            byte *code;
+            size_t len;
+            size_t module_init_offset;
+        } u_loadable_native;
     } data;
 } mp_raw_code_t;
 
@@ -70,6 +76,7 @@ void mp_emit_glue_assign_bytecode(mp_raw_code_t *rc, const byte *code, mp_uint_t
     #endif
     mp_uint_t scope_flags);
 void mp_emit_glue_assign_native(mp_raw_code_t *rc, mp_raw_code_kind_t kind, void *fun_data, mp_uint_t fun_len, const mp_uint_t *const_table, mp_uint_t n_pos_args, mp_uint_t scope_flags, mp_uint_t type_sig);
+void mp_emit_glue_assign_loadable_native(mp_raw_code_t *rc, byte *code, size_t len, size_t module_init_offset);
 
 mp_obj_t mp_make_function_from_raw_code(const mp_raw_code_t *rc, mp_obj_t def_args, mp_obj_t def_kw_args);
 mp_obj_t mp_make_closure_from_raw_code(const mp_raw_code_t *rc, mp_uint_t n_closed_over, const mp_obj_t *args);

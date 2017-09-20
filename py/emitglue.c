@@ -82,6 +82,15 @@ void mp_emit_glue_assign_bytecode(mp_raw_code_t *rc, const byte *code, mp_uint_t
 #endif
 }
 
+void mp_emit_glue_assign_loadable_native(mp_raw_code_t *rc, byte *code, size_t len, size_t module_init_offset) {
+    rc->kind = MP_CODE_NATIVE_LOADABLE;
+    rc->scope_flags = 0;
+    rc->n_pos_args = 1;
+    rc->data.u_loadable_native.code = code;
+    rc->data.u_loadable_native.len = len;
+    rc->data.u_loadable_native.module_init_offset = module_init_offset;
+}
+
 #if MICROPY_EMIT_NATIVE || MICROPY_EMIT_INLINE_ASM
 void mp_emit_glue_assign_native(mp_raw_code_t *rc, mp_raw_code_kind_t kind, void *fun_data, mp_uint_t fun_len, const mp_uint_t *const_table, mp_uint_t n_pos_args, mp_uint_t scope_flags, mp_uint_t type_sig) {
     assert(kind == MP_CODE_NATIVE_PY || kind == MP_CODE_NATIVE_VIPER || kind == MP_CODE_NATIVE_ASM);
@@ -139,6 +148,9 @@ mp_obj_t mp_make_function_from_raw_code(const mp_raw_code_t *rc, mp_obj_t def_ar
             fun = mp_obj_new_fun_asm(rc->n_pos_args, rc->data.u_native.fun_data, rc->data.u_native.type_sig);
             break;
         #endif
+        case MP_CODE_NATIVE_LOADABLE:
+            fun = mp_obj_new_fun_loadable_native(rc->n_pos_args, rc->data.u_loadable_native.code, rc->data.u_loadable_native.len, rc->data.u_loadable_native.module_init_offset);
+            break;
         default:
             // rc->kind should always be set and BYTECODE is the only remaining case
             assert(rc->kind == MP_CODE_BYTECODE);
