@@ -579,83 +579,36 @@ mp_obj_t mp_obj_new_fun_asm(size_t n_args, void *fun_data, mp_uint_t type_sig) {
 
 #include "py/emitglue.h"
 
-typedef mp_obj_t (*mp_fun_per_nat_0_t)();
-typedef mp_obj_t (*mp_fun_per_nat_1_t)(mp_obj_t);
-typedef mp_obj_t (*mp_fun_per_nat_2_t)(mp_obj_t, mp_obj_t);
-typedef mp_obj_t (*mp_fun_per_nat_3_t)(mp_obj_t, mp_obj_t, mp_obj_t);
-typedef mp_obj_t (*mp_fun_per_nat_var_t)(mp_uint_t n, const mp_obj_t *);
-typedef mp_obj_t (*mp_fun_per_nat_kw_t)(mp_uint_t n, const mp_obj_t *, mp_map_t *);
-
-typedef struct _mp_obj_fun_persistent_native_t {
-    mp_obj_base_t base;
-    bool is_kw : 1;
-    mp_uint_t n_args_min : 15; // inclusive
-    mp_uint_t n_args_max : 16; // inclusive
-    const void *fun_data; // GC must be able to trace this pointer
-    mp_obj_dict_t *dict_globals;
-} mp_obj_fun_persistent_native_t;
-
-STATIC const mp_obj_type_t mp_type_fun_persistent_native;
-
-STATIC mp_obj_t fun_persistent_native_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    assert(MP_OBJ_IS_TYPE(self_in, &mp_type_fun_persistent_native));
-    mp_obj_fun_persistent_native_t *self = self_in;
-
-    // check number of arguments
-    mp_arg_check_num(n_args, n_kw, self->n_args_min, self->n_args_max, self->is_kw);
-
-    const void *fun = MICROPY_MAKE_POINTER_CALLABLE(self->fun_data);
-
-    if (self->is_kw) {
-        // function allows keywords
-
-        // we create a map directly from the given args array
-        mp_map_t kw_args;
-        mp_map_init_fixed_table(&kw_args, n_kw, args + n_args);
-
-        return ((mp_fun_per_nat_kw_t)fun)(n_args, args, &kw_args);
-
-    } else if (self->n_args_min <= 3 && self->n_args_min == self->n_args_max) {
-        // function requires a fixed number of arguments
-
-        // dispatch function call
-        switch (self->n_args_min) {
+mp_obj_t mp_obj_new_fun_persistent_native(bool is_kw, mp_uint_t n_args_min, mp_uint_t n_args_max, const void *f) {
+    if (!is_kw && n_args_min <= 3 && n_args_min == n_args_max) {
+        mp_obj_fun_builtin_fixed_t *self = m_new_obj(mp_obj_fun_builtin_fixed_t);
+        switch (n_args_min) {
             case 0:
-                return ((mp_fun_per_nat_0_t)fun)();
-
+                self->base.type = &mp_type_fun_builtin_0;
+                break;
             case 1:
-                return ((mp_fun_per_nat_1_t)fun)(args[0]);
-
+                self->base.type = &mp_type_fun_builtin_1;
+                break;
             case 2:
-                return ((mp_fun_per_nat_2_t)fun)(args[0], args[1]);
-
+                self->base.type = &mp_type_fun_builtin_2;
+                break;
             case 3:
             default:
-                return ((mp_fun_per_nat_3_t)fun)(args[0], args[1], args[2]);
+                self->base.type = &mp_type_fun_builtin_3;
+                break;
         }
-
+        self->fun._0 = f;
+        return self;
     } else {
-        // function takes a variable number of arguments, but no keywords
-
-        return ((mp_fun_per_nat_var_t)fun)(n_args, args);
+        // TODO untested
+        mp_obj_fun_builtin_var_t *self = m_new_obj(mp_obj_fun_builtin_var_t);
+        self->base.type = &mp_type_fun_builtin_var;
+        self->is_kw = is_kw;
+        self->n_args_min = n_args_min;
+        self->n_args_max = n_args_max;
+        self->fun.var = f;
+        return self;
     }
-}
-
-STATIC const mp_obj_type_t mp_type_fun_persistent_native = {
-    { &mp_type_type },
-    .name = MP_QSTR_function,
-    .call = fun_persistent_native_call,
-};
-
-mp_obj_t mp_obj_new_fun_persistent_native(bool is_kw, mp_uint_t n_args_min, mp_uint_t n_args_max, const void *f) {
-    mp_obj_fun_persistent_native_t *self = m_new_obj(mp_obj_fun_persistent_native_t);
-    self->base.type = &mp_type_fun_persistent_native;
-    self->is_kw = is_kw;
-    self->n_args_min = n_args_min;
-    self->n_args_max = n_args_max;
-    self->fun_data = f;
-    self->dict_globals = mp_globals_get();
-    return self;
 }
 
 #endif // MICROPY_PERSISTENT_NATIVE
