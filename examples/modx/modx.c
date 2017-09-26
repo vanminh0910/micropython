@@ -1,5 +1,11 @@
 #include "py/persistnative.h"
 
+__attribute__((section(".mpy_fun_table")))
+void *fun_table;
+
+__attribute__((section(".mpy_qstr_table")))
+void *qstr_table;
+
 #define QSTR_DEFINES \
     QDEF(VAL1, "VAL1") \
     QDEF(VAL2, "VAL2") \
@@ -14,11 +20,11 @@ enum {
     MP_LOCAL_QSTR_number_of,
 };
 
-STATIC mp_obj_t modx_add1(CONTEXT mp_obj_t x) {
+STATIC mp_obj_t modx_add1(mp_obj_t x) {
     return RT(mp_binary_op)(MP_BINARY_OP_ADD, x, MP_OBJ_NEW_SMALL_INT(1));
 }
 
-STATIC mp_obj_t modx_make_list(CONTEXT mp_obj_t x, mp_obj_t y) {
+STATIC mp_obj_t modx_make_list(mp_obj_t x, mp_obj_t y) {
     mp_obj_t list[6] = {
         MP_OBJ_NEW_SMALL_INT(1),
         MP_OBJ_NEW_SMALL_INT(2),
@@ -33,10 +39,10 @@ STATIC mp_obj_t modx_make_list(CONTEXT mp_obj_t x, mp_obj_t y) {
 MP_PERSISTENT_NATIVE_HEADER
 
 MP_PERSISTENT_NATIVE_INIT
-void init(CONTEXT_ALONE) {
+void init() {
     // create qstrs
     {
-        qstr *q = pnd->qstr_table;
+        qstr *q = qstr_table;
         #define QDEF(id, str) *q++ = RT(qstr_from_str)(str);
         QSTR_DEFINES
         #undef QDEF

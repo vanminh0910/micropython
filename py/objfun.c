@@ -579,12 +579,12 @@ mp_obj_t mp_obj_new_fun_asm(size_t n_args, void *fun_data, mp_uint_t type_sig) {
 
 #include "py/emitglue.h"
 
-typedef mp_obj_t (*mp_fun_per_nat_0_t)(mp_persistent_native_data_t *et);
-typedef mp_obj_t (*mp_fun_per_nat_1_t)(mp_persistent_native_data_t *et, mp_obj_t);
-typedef mp_obj_t (*mp_fun_per_nat_2_t)(mp_persistent_native_data_t *et, mp_obj_t, mp_obj_t);
-typedef mp_obj_t (*mp_fun_per_nat_3_t)(mp_persistent_native_data_t *et, mp_obj_t, mp_obj_t, mp_obj_t);
-typedef mp_obj_t (*mp_fun_per_nat_var_t)(mp_persistent_native_data_t *et, mp_uint_t n, const mp_obj_t *);
-typedef mp_obj_t (*mp_fun_per_nat_kw_t)(mp_persistent_native_data_t *et, mp_uint_t n, const mp_obj_t *, mp_map_t *);
+typedef mp_obj_t (*mp_fun_per_nat_0_t)();
+typedef mp_obj_t (*mp_fun_per_nat_1_t)(mp_obj_t);
+typedef mp_obj_t (*mp_fun_per_nat_2_t)(mp_obj_t, mp_obj_t);
+typedef mp_obj_t (*mp_fun_per_nat_3_t)(mp_obj_t, mp_obj_t, mp_obj_t);
+typedef mp_obj_t (*mp_fun_per_nat_var_t)(mp_uint_t n, const mp_obj_t *);
+typedef mp_obj_t (*mp_fun_per_nat_kw_t)(mp_uint_t n, const mp_obj_t *, mp_map_t *);
 
 typedef struct _mp_obj_fun_persistent_native_t {
     mp_obj_base_t base;
@@ -593,7 +593,6 @@ typedef struct _mp_obj_fun_persistent_native_t {
     mp_uint_t n_args_max : 16; // inclusive
     const void *fun_data; // GC must be able to trace this pointer
     mp_obj_dict_t *dict_globals;
-    mp_persistent_native_data_t *per_nat_data;
 } mp_obj_fun_persistent_native_t;
 
 STATIC const mp_obj_type_t mp_type_fun_persistent_native;
@@ -614,7 +613,7 @@ STATIC mp_obj_t fun_persistent_native_call(mp_obj_t self_in, mp_uint_t n_args, m
         mp_map_t kw_args;
         mp_map_init_fixed_table(&kw_args, n_kw, args + n_args);
 
-        return ((mp_fun_per_nat_kw_t)fun)(self->per_nat_data, n_args, args, &kw_args);
+        return ((mp_fun_per_nat_kw_t)fun)(n_args, args, &kw_args);
 
     } else if (self->n_args_min <= 3 && self->n_args_min == self->n_args_max) {
         // function requires a fixed number of arguments
@@ -622,23 +621,23 @@ STATIC mp_obj_t fun_persistent_native_call(mp_obj_t self_in, mp_uint_t n_args, m
         // dispatch function call
         switch (self->n_args_min) {
             case 0:
-                return ((mp_fun_per_nat_0_t)fun)(self->per_nat_data);
+                return ((mp_fun_per_nat_0_t)fun)();
 
             case 1:
-                return ((mp_fun_per_nat_1_t)fun)(self->per_nat_data, args[0]);
+                return ((mp_fun_per_nat_1_t)fun)(args[0]);
 
             case 2:
-                return ((mp_fun_per_nat_2_t)fun)(self->per_nat_data, args[0], args[1]);
+                return ((mp_fun_per_nat_2_t)fun)(args[0], args[1]);
 
             case 3:
             default:
-                return ((mp_fun_per_nat_3_t)fun)(self->per_nat_data, args[0], args[1], args[2]);
+                return ((mp_fun_per_nat_3_t)fun)(args[0], args[1], args[2]);
         }
 
     } else {
         // function takes a variable number of arguments, but no keywords
 
-        return ((mp_fun_per_nat_var_t)fun)(self->per_nat_data, n_args, args);
+        return ((mp_fun_per_nat_var_t)fun)(n_args, args);
     }
 }
 
@@ -648,7 +647,7 @@ STATIC const mp_obj_type_t mp_type_fun_persistent_native = {
     .call = fun_persistent_native_call,
 };
 
-mp_obj_t mp_obj_new_fun_persistent_native(bool is_kw, mp_uint_t n_args_min, mp_uint_t n_args_max, const void *f, void *per_nat_data) {
+mp_obj_t mp_obj_new_fun_persistent_native(bool is_kw, mp_uint_t n_args_min, mp_uint_t n_args_max, const void *f) {
     mp_obj_fun_persistent_native_t *self = m_new_obj(mp_obj_fun_persistent_native_t);
     self->base.type = &mp_type_fun_persistent_native;
     self->is_kw = is_kw;
@@ -656,7 +655,6 @@ mp_obj_t mp_obj_new_fun_persistent_native(bool is_kw, mp_uint_t n_args_min, mp_u
     self->n_args_max = n_args_max;
     self->fun_data = f;
     self->dict_globals = mp_globals_get();
-    self->per_nat_data = per_nat_data;
     return self;
 }
 

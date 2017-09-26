@@ -34,24 +34,22 @@
 // Macros to make it easy to write persistent native code.  The intention is
 // that these macros can be redefined if such code is to be compiled statically
 // into the executable.
-#define CONTEXT_ALONE mp_persistent_native_data_t *pnd
-#define CONTEXT mp_persistent_native_data_t *pnd,
-#define QSTR(id) (pnd->qstr_table[MP_LOCAL_QSTR_ ## id])
-#define RT(id) ((mp_fun_table_t*)pnd->fun_table)->id
-#define CONST(id) ((mp_obj_t)((mp_fun_table_t*)pnd->fun_table)->mp_const ## id ## _obj)
-#define MAKE_FUN_0(fun_name) RT(mp_obj_new_fun_extern)(false, 0, 0, fun_name, pnd)
-#define MAKE_FUN_1(fun_name) RT(mp_obj_new_fun_extern)(false, 1, 1, fun_name, pnd)
-#define MAKE_FUN_2(fun_name) RT(mp_obj_new_fun_extern)(false, 2, 2, fun_name, pnd)
-#define MAKE_FUN_3(fun_name) RT(mp_obj_new_fun_extern)(false, 3, 3, fun_name, pnd)
-#define MAKE_FUN_VAR(mn, fun_name) RT(mp_obj_new_fun_extern)(false, mn, MP_OBJ_FUN_ARGS_MAX, fun_name, pnd)
-#define MAKE_FUN_VAR_BETWEEN(mn, mx, fun_name) RT(mp_obj_new_fun_extern)(false, mn, MP_OBJ_FUN_ARGS_MAX, fun_name, pnd)
-#define MAKE_FUN_KW(mn, fun_name) RT(mp_obj_new_fun_extern)(true, mn, MP_OBJ_FUN_ARGS_MAX, fun_name, pnd)
+#define QSTR(id) (((qstr*)qstr_table)[MP_LOCAL_QSTR_ ## id])
+#define RT(id) (((mp_fun_table_t*)fun_table)->id)
+#define CONST(id) ((mp_obj_t)((mp_fun_table_t*)fun_table)->mp_const ## id ## _obj)
+#define MAKE_FUN_0(fun_name) RT(mp_obj_new_fun_extern)(false, 0, 0, fun_name)
+#define MAKE_FUN_1(fun_name) RT(mp_obj_new_fun_extern)(false, 1, 1, fun_name)
+#define MAKE_FUN_2(fun_name) RT(mp_obj_new_fun_extern)(false, 2, 2, fun_name)
+#define MAKE_FUN_3(fun_name) RT(mp_obj_new_fun_extern)(false, 3, 3, fun_name)
+#define MAKE_FUN_VAR(mn, fun_name) RT(mp_obj_new_fun_extern)(false, mn, MP_OBJ_FUN_ARGS_MAX, fun_name)
+#define MAKE_FUN_VAR_BETWEEN(mn, mx, fun_name) RT(mp_obj_new_fun_extern)(false, mn, MP_OBJ_FUN_ARGS_MAX, fun_name)
+#define MAKE_FUN_KW(mn, fun_name) RT(mp_obj_new_fun_extern)(true, mn, MP_OBJ_FUN_ARGS_MAX, fun_name)
 
 // The linker likes to align the text following this header, so we make
 // the header a nice multiple of 8 to prevent padding being inserted.
 // TODO: consolidate the first 4 bytes here with stuff in persistentcode.c
 #define MP_PERSISTENT_NATIVE_HEADER \
-    __attribute__((section(".mpyheader"))) \
+    __attribute__((section(".mpy_header"))) \
     const byte header[16] = { \
         'M', \
         2, \
@@ -66,7 +64,7 @@
     };
 
 #define MP_PERSISTENT_NATIVE_INIT \
-    __attribute__((section(".mpytext")))
+    __attribute__((section(".mpy_text")))
 
 struct _mp_raw_code_t;
 struct _mp_code_state;
@@ -120,7 +118,7 @@ typedef struct _mp_fun_table_t {
     void (*mp_setup_code_state)(struct _mp_code_state *code_state, mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args);
     qstr (*qstr_from_str)(const char *str);
     qstr (*qstr_from_strn)(const char *str, mp_uint_t len);
-    mp_obj_t (*mp_obj_new_fun_extern)(bool is_kw, mp_uint_t n_args_min, mp_uint_t n_args_max, void *f, void *per_nat_data);
+    mp_obj_t (*mp_obj_new_fun_extern)(bool is_kw, mp_uint_t n_args_min, mp_uint_t n_args_max, void *f);
     mp_const_obj_t mp_const_none_obj;
     mp_const_obj_t mp_const_false_obj;
     mp_const_obj_t mp_const_true_obj;

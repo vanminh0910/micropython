@@ -183,16 +183,6 @@ const void *const mp_fun_table[MP_F_NUMBER_OF] = {
 #endif
 };
 
-#if MICROPY_PERSISTENT_NATIVE
-mp_persistent_native_data_t *mp_new_persistent_native_data(size_t num_qstrs) {
-    mp_persistent_native_data_t *data = m_new_obj(mp_persistent_native_data_t);
-    data->fun_table = mp_fun_table;
-    data->qstr_table = m_new0(qstr, num_qstrs);
-    data->data = NULL;
-    return data;
-}
-#endif
-
 /*
 void mp_f_vector(mp_fun_kind_t fun_kind) {
     (mp_f_table[fun_kind])();

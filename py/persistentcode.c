@@ -227,11 +227,9 @@ mp_raw_code_t *load_raw_code_native(mp_reader_t *reader) {
     MP_PLAT_ALLOC_EXEC(len, &data, &alloc);
     read_bytes(reader, data, len);
 
-    mp_persistent_native_data_t *per_nat_data = mp_new_persistent_native_data(num_qstrs);
-
     // create raw_code and return it
     mp_raw_code_t *rc = mp_emit_glue_new_raw_code();
-    mp_emit_glue_assign_persistent_native(rc, data, per_nat_data, 0);
+    mp_emit_glue_assign_persistent_native(rc, data, num_qstrs, 0);
     return rc;
 }
 #endif
