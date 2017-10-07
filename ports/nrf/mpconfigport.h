@@ -201,6 +201,7 @@ typedef long mp_off_t;
 // extra built in modules to add to the list of known ones
 extern const struct _mp_obj_module_t pyb_module;
 extern const struct _mp_obj_module_t machine_module;
+extern const struct _mp_obj_module_t nrf_module;
 extern const struct _mp_obj_module_t mp_module_utime;
 extern const struct _mp_obj_module_t mp_module_uos;
 extern const struct _mp_obj_module_t mp_module_ubluepy;
@@ -225,6 +226,12 @@ extern const struct _mp_obj_module_t random_module;
 #define RANDOM_MODULE
 #endif
 
+#if MICROPY_PY_NRF
+#define NRF_MODULE { MP_ROM_QSTR(MP_QSTR_nrf), MP_ROM_PTR(&nrf_module) },
+#else
+#define NRF_MODULE
+#endif
+
 #if BLUETOOTH_SD
 
 #if MICROPY_PY_BLE
@@ -241,6 +248,7 @@ extern const struct _mp_obj_module_t ble_module;
     { MP_ROM_QSTR(MP_QSTR_time), MP_ROM_PTR(&mp_module_utime) }, \
     { MP_ROM_QSTR(MP_QSTR_uos), MP_ROM_PTR(&mp_module_uos) }, \
     BLE_MODULE \
+    NRF_MODULE \
     MUSIC_MODULE \
     UBLUEPY_MODULE \
     RANDOM_MODULE \
@@ -253,6 +261,7 @@ extern const struct _mp_obj_module_t ble_module;
     { MP_ROM_QSTR(MP_QSTR_machine), MP_ROM_PTR(&machine_module) }, \
     { MP_ROM_QSTR(MP_QSTR_utime), MP_ROM_PTR(&mp_module_utime) }, \
     { MP_ROM_QSTR(MP_QSTR_uos), MP_ROM_PTR(&mp_module_uos) }, \
+    NRF_MODULE \
     MUSIC_MODULE \
     RANDOM_MODULE \
 

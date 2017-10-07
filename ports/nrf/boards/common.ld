@@ -101,3 +101,6 @@ SECTIONS
 
     .ARM.attributes 0 : { *(.ARM.attributes) }
 }
+
+_flash_user_start = ORIGIN(FLASH_USER);
+_flash_user_end   = ORIGIN(FLASH_USER) + LENGTH(FLASH_USER);

@@ -126,6 +126,7 @@ SRC_HAL = $(addprefix hal/,\
 	hal_temp.c \
 	hal_gpio.c \
 	hal_rng.c \
+	hal_nvmc.c \
 	)
 
 ifeq ($(MCU_VARIANT), nrf52)
@@ -158,6 +159,7 @@ DRIVERS_SRC_C += $(addprefix modules/,\
 	machine/pwm.c \
 	machine/led.c \
 	machine/temp.c \
+	nrf/modnrf.c \
 	uos/moduos.c \
 	utime/modutime.c \
 	pyb/modpyb.c \
