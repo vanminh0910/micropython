@@ -32,6 +32,7 @@
 #define MICROPY_HW_MCU_NAME         "NRF51822"
 #define MICROPY_PY_SYS_PLATFORM     "nrf51"
 
+#define MICROPY_PY_NRF              (1)
 #define MICROPY_PY_MACHINE_HW_SPI   (1)
 #define MICROPY_PY_MACHINE_TIMER    (1)
 #define MICROPY_PY_MACHINE_RTC      (1)
@@ -46,6 +47,7 @@
 #define MICROPY_HW_HAS_MMA7660      (0)
 #define MICROPY_HW_HAS_LIS3DSH      (0)
 #define MICROPY_HW_HAS_LCD          (0)
+#define MICROPY_HW_HAS_BUILTIN_FLASH (1)
 #define MICROPY_HW_ENABLE_RNG       (0)
 #define MICROPY_HW_ENABLE_RTC       (0)
 #define MICROPY_HW_ENABLE_TIMER     (0)
