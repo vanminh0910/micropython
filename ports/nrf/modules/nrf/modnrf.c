@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include "py/runtime.h"
 #include "hal/hal_nvmc.h"
+#include "extmod/vfs.h"
 
 #if MICROPY_PY_NRF
 
@@ -37,84 +38,93 @@ extern byte _flash_user_start[];
 extern byte _flash_user_end[];
 
 #if defined(NRF51)
-#define FLASH_BLOCKSIZE 1024
+#define FLASH_BLOCKSIZE (1024)
 #elif defined(NRF52)
-#define FLASH_BLOCKSIZE 4096
+#define FLASH_BLOCKSIZE (4096)
 #else
 #error Unknown chip
 #endif
 
-
-/// \method flash_user_start()
-/// Return start address of user flash (right behind the firmware).
-mp_obj_t nrf_flash_user_start(void) {
-    return MP_OBJ_NEW_SMALL_INT((uint32_t)_flash_user_start);
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(nrf_flash_user_start_obj, nrf_flash_user_start);
+#define FLASH_RESERVER_BLOCKS (1)
+#define FLASH_BLOCK_START ((uint32_t)_flash_user_start / FLASH_BLOCKSIZE + FLASH_RESERVER_BLOCKS)
 
 
-/// \method flash_user_end()
-/// Return end address of user flash.
-mp_obj_t nrf_flash_user_end(void) {
-    return MP_OBJ_NEW_SMALL_INT((uint32_t)_flash_user_end);
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(nrf_flash_user_end_obj, nrf_flash_user_end);
-
-
-/// \method flash_read()
-/// Read the flash at address into buf.
-mp_obj_t nrf_flash_read(mp_obj_t address_in, mp_obj_t buf_in) {
-    mp_int_t address = mp_obj_get_int(address_in);
+mp_obj_t nrf_flashbdev_readblocks(mp_obj_t self_in, mp_obj_t n_in, mp_obj_t buf_in) {
+    mp_int_t n = mp_obj_get_int(n_in);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_WRITE);
 
+    mp_int_t address = (FLASH_BLOCK_START + n) * FLASH_BLOCKSIZE;
     byte *buf = bufinfo.buf;
-
     byte *p = (byte*)address;
     for (int i=0; i<bufinfo.len; i++) {
         buf[i] = p[i];
     }
-
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(nrf_flash_read_obj, nrf_flash_read);
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(nrf_flashbdev_readblocks_obj, nrf_flashbdev_readblocks);
 
-
-/// \method flash_erase()
-/// Erase a single page pointed to by address.
-mp_obj_t nrf_flash_erase(mp_obj_t address_in) {
-    uint32_t address = mp_obj_get_int(address_in);
-    hal_nvmc_erase_page(address);
-    return mp_const_none;
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(nrf_flash_erase_obj, nrf_flash_erase);
-
-
-/// \method flash_write()
-/// Write buf to address.
-mp_obj_t nrf_flash_write(mp_obj_t address_in, mp_obj_t buf_in) {
-    uint32_t address = mp_obj_get_int(address_in);
+mp_obj_t nrf_flashbdev_writeblocks(mp_obj_t self_in, mp_obj_t n_in, mp_obj_t buf_in) {
+    mp_int_t n = mp_obj_get_int(n_in);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_READ);
 
+    mp_int_t address = (FLASH_BLOCK_START + n) * FLASH_BLOCKSIZE;
     if (address & 0x3 || bufinfo.len & 0x3) {
         mp_raise_ValueError("invalid address or buffer length");
     }
 
+    // TODO: erase all blocks, not just the first.
+    hal_nvmc_erase_page(address);
     hal_nvmc_write_buffer(address, bufinfo.buf, bufinfo.len/4);
+
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(nrf_flash_write_obj, nrf_flash_write);
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(nrf_flashbdev_writeblocks_obj, nrf_flashbdev_writeblocks);
+
+
+mp_obj_t nrf_flashbdev_ioctl(mp_obj_t self_in, mp_obj_t op_in, mp_obj_t arg_in) {
+    mp_int_t op = mp_obj_get_int(op_in);
+    if (op == BP_IOCTL_SEC_COUNT) {
+        mp_int_t block_start = (uint32_t)_flash_user_start / FLASH_BLOCKSIZE + FLASH_RESERVER_BLOCKS;
+        mp_int_t block_end = (uint32_t)_flash_user_end / FLASH_BLOCKSIZE;
+        mp_int_t num_blocks = block_end - block_start;
+        return MP_OBJ_NEW_SMALL_INT(num_blocks);
+    }
+    if (op == BP_IOCTL_SEC_SIZE) {
+        return MP_OBJ_NEW_SMALL_INT(FLASH_BLOCKSIZE);
+    }
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(nrf_flashbdev_ioctl_obj, nrf_flashbdev_ioctl);
+
+
+STATIC const mp_rom_map_elem_t nrf_flashbdev_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_readblocks), MP_ROM_PTR(&nrf_flashbdev_readblocks_obj) },
+    { MP_ROM_QSTR(MP_QSTR_writeblocks), MP_ROM_PTR(&nrf_flashbdev_writeblocks_obj) },
+    { MP_ROM_QSTR(MP_QSTR_ioctl), MP_ROM_PTR(&nrf_flashbdev_ioctl_obj) },
+};
+
+STATIC MP_DEFINE_CONST_DICT(nrf_flashbdev_locals_dict, nrf_flashbdev_locals_dict_table);
+
+static const mp_obj_type_t nrf_flashbdev_type = {
+    { &mp_type_type },
+    .name = MP_QSTR_FlashBdev,
+    .locals_dict = (mp_obj_dict_t*)&nrf_flashbdev_locals_dict,
+};
+
+typedef struct {
+    mp_obj_base_t base;
+} nrf_flashbdev_obj_t;
+
+STATIC const nrf_flashbdev_obj_t nrf_flashbdev_obj = {
+    { &nrf_flashbdev_type },
+};
 
 
 STATIC const mp_rom_map_elem_t nrf_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__),         MP_ROM_QSTR(MP_QSTR_nrf) },
-    { MP_ROM_QSTR(MP_QSTR_flash_user_start), MP_ROM_PTR(&nrf_flash_user_start_obj) },
-    { MP_ROM_QSTR(MP_QSTR_flash_user_end),   MP_ROM_PTR(&nrf_flash_user_end_obj) },
-    { MP_ROM_QSTR(MP_QSTR_flash_block_size), MP_ROM_INT(FLASH_BLOCKSIZE) },
-    { MP_ROM_QSTR(MP_QSTR_flash_read),       MP_ROM_PTR(&nrf_flash_read_obj) },
-    { MP_ROM_QSTR(MP_QSTR_flash_erase),      MP_ROM_PTR(&nrf_flash_erase_obj) },
-    { MP_ROM_QSTR(MP_QSTR_flash_write),      MP_ROM_PTR(&nrf_flash_write_obj) },
+    { MP_ROM_QSTR(MP_QSTR_flashbdev),        MP_ROM_PTR(&nrf_flashbdev_obj) },
 };
 
 
