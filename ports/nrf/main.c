@@ -137,6 +137,17 @@ soft_reset:
 
 pin_init0();
 
+#if MICROPY_HW_HAS_BUILTIN_FLASH
+    // Setup builtin flash
+    do_str("import uos, nrf\n" \
+           "try:\n" \
+           " uos.mount(nrf.flashbdev, '/')\n" \
+           "except OSError:\n" \
+           " uos.VfsFat.mkfs(nrf.flashbdev)\n" \
+           " uos.mount(nrf.flashbdev, '/')\n",
+           MP_PARSE_FILE_INPUT);
+#endif
+
 #if MICROPY_HW_HAS_SDCARD
     // if an SD card is present then mount it on /sd/
     if (sdcard_is_present()) {
