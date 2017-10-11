@@ -38,6 +38,8 @@
 #include "py/gc.h"
 #include "py/compile.h"
 #include "lib/utils/pyexec.h"
+#include "extmod/vfs.h"
+#include "modules/uos/microbitfs.h"
 #include "readline.h"
 #include "gccollect.h"
 #include "modmachine.h"
@@ -141,7 +143,13 @@ pin_init0();
 #if MICROPY_HW_HAS_BUILTIN_FLASH
 #if MICROPY_PY_UOS_MICROBITFS
     // Setup builtin flash as microbit filesystem
-    do_str("import uos; uos.mount(uos.microbitfs, '/')", MP_PARSE_FILE_INPUT);
+    const mp_obj_t meth[] = {
+        MP_OBJ_TO_PTR(&mp_vfs_mount_obj),
+        NULL,
+        MP_OBJ_TO_PTR(&mbfs_obj),
+        MP_ROM_QSTR(MP_QSTR__slash_),
+    };
+    mp_call_method_n_kw(2, 0, meth);
 #elif MICROPY_PY_NRF
     // Setup builtin flash as FAT filesystem
     do_str("import uos, nrf\n" \

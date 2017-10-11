@@ -39,7 +39,6 @@
 //#include "timeutils.h"
 //#include "rng.h"
 #include "uart.h"
-#include "microbitfs.h"
 //#include "portmodules.h"
 
 /// \module os - basic "operating system" services
@@ -159,9 +158,6 @@ STATIC const mp_rom_map_elem_t os_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_mount), MP_ROM_PTR(&mp_vfs_mount_obj) },
     { MP_ROM_QSTR(MP_QSTR_umount), MP_ROM_PTR(&mp_vfs_umount_obj) },
     { MP_ROM_QSTR(MP_QSTR_VfsFat), MP_ROM_PTR(&mp_fat_vfs_type) },
-#if MICROPY_PY_UOS_MICROBITFS
-    { MP_ROM_QSTR(MP_QSTR_microbitfs), MP_ROM_PTR(&mbfs_obj) },
-#endif
 };
 
 STATIC MP_DEFINE_CONST_DICT(os_module_globals, os_module_globals_table);

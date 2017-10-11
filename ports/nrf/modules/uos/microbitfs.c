@@ -467,14 +467,10 @@ extern const mp_obj_type_t mbfs_type;
 
 
 STATIC mp_obj_t mbfs_mount(mp_obj_t self_in, mp_obj_t readonly, mp_obj_t mkfs) {
-    // TODO readonly flag
-
-    STATIC bool mounted = false;
-    if (!mounted) {
-        microbit_filesystem_init();
-    }
-    mounted = true;
-
+    // This function is called only once (indirectly from main()) and is
+    // not exposed to Python code. So we can ignore the readonly flag and
+    // not care about mounting a second time.
+    microbit_filesystem_init();
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(mbfs_mount_obj, mbfs_mount);
