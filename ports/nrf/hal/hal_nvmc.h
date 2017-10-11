@@ -44,6 +44,14 @@ bool hal_nvmc_write_byte(byte *dest, byte b);
 // Write an (unaligned) byte buffer to flash.
 bool hal_nvmc_write_buffer(void *dest_in, const void *buf_in, size_t len);
 
+enum {
+    HAL_NVMC_STATE_BUSY,
+    HAL_NVMC_STATE_SUCCESS,
+    HAL_NVMC_STATE_ERROR,
+};
+
+extern volatile uint8_t hal_nvmc_operation_state;
+
 #if defined(NRF51)
 #define HAL_NVMC_PAGESIZE (1024)
 

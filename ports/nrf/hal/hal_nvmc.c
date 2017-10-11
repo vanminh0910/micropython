@@ -37,24 +37,43 @@
 
 #if BLUETOOTH_SD
 
-bool hal_nvmc_erase_page(uint32_t pageaddr) {
-    uint32_t result = sd_flash_page_erase(pageaddr / HAL_NVMC_PAGESIZE);
-    if (ble_drv_stack_enabled() == 1) {
-        // TODO wait for result
-        return result == NRF_SUCCESS;
-    } else {
+volatile uint8_t hal_nvmc_operation_state = HAL_NVMC_STATE_BUSY;
+
+STATIC void operation_init() {
+    hal_nvmc_operation_state = HAL_NVMC_STATE_BUSY;
+}
+
+STATIC bool operation_complete(uint32_t result) {
+    if (ble_drv_stack_enabled() != 1) {
+        // SoftDevice is not enabled, no event will be generated.
         return result == NRF_SUCCESS;
     }
+
+    if (result != NRF_SUCCESS) {
+        // In all other (non-success) cases, the command hasn't been
+        // started and no event will be generated.
+        return false;
+    }
+
+    // Wait until the event has been generated.
+    while (hal_nvmc_operation_state == HAL_NVMC_STATE_BUSY) {
+        __WFE();
+    }
+
+    // Now we can safely continue, flash operation has completed.
+    return hal_nvmc_operation_state == HAL_NVMC_STATE_SUCCESS;
+}
+
+bool hal_nvmc_erase_page(uint32_t pageaddr) {
+    operation_init();
+    uint32_t result = sd_flash_page_erase(pageaddr / HAL_NVMC_PAGESIZE);
+    return operation_complete(result);
 }
 
 bool hal_nvmc_write_words(uint32_t *dest, const uint32_t *buf, size_t len) {
+    operation_init();
     uint32_t result = sd_flash_write(dest, buf, len);
-    if (ble_drv_stack_enabled() == 1) {
-        // TODO wait for result
-        return result == NRF_SUCCESS;
-    } else {
-        return result == NRF_SUCCESS;
-    }
+    return operation_complete(result);
 }
 
 bool hal_nvmc_write_byte(byte *dest_in, byte b) {
@@ -69,13 +88,9 @@ bool hal_nvmc_write_byte(byte *dest_in, byte b) {
         value = (value << 8) | 0xff;
     }
 
+    operation_init();
     uint32_t result = sd_flash_write((uint32_t*)dest_aligned, &value, 1);
-    if (ble_drv_stack_enabled() == 1) {
-        // TODO wait for result
-        return result == NRF_SUCCESS;
-    } else {
-        return result == NRF_SUCCESS;
-    }
+    return operation_complete(result);
 }
 
 #else // BLUETOOTH_SD
