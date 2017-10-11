@@ -431,6 +431,25 @@ STATIC void microbit_file_close(file_descriptor_obj *fd) {
     fd->open = false;
 }
 
+STATIC mp_obj_t microbit_file_size(mp_obj_t filename) {
+    mp_uint_t name_len;
+    const char *name = mp_obj_str_get_data(filename, &name_len);
+    uint8_t chunk = microbit_find_file(name, name_len);
+    if (chunk == 255) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, "file not found"));
+    }
+    mp_uint_t len = 0;
+    uint8_t end_offset = file_system_chunks[chunk].header.end_offset;
+    uint8_t offset = file_system_chunks[chunk].header.name_len+2;
+    while (file_system_chunks[chunk].next_chunk != UNUSED_CHUNK) {
+        len += DATA_PER_CHUNK - offset;
+        chunk = file_system_chunks[chunk].next_chunk;
+        offset = 0;
+    }
+    len += end_offset - offset;
+    return mp_obj_new_int(len);
+}
+
 STATIC mp_obj_t mbfs_file_name(mp_obj_t self) {
     file_descriptor_obj *fd = (file_descriptor_obj*)self;
     return microbit_file_name(fd);
@@ -610,12 +629,31 @@ mode_error:
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mbfs_open_obj, 2, 3, mbfs_open);
 
+STATIC mp_obj_t mbfs_stat(mp_obj_t self, mp_obj_t filename) {
+    mp_obj_t file_size = microbit_file_size(filename);
+
+    mp_obj_tuple_t *t = MP_OBJ_TO_PTR(mp_obj_new_tuple(10, NULL));
+    t->items[0] = MP_OBJ_NEW_SMALL_INT(MP_S_IFREG); // st_mode
+    t->items[1] = MP_OBJ_NEW_SMALL_INT(0); // st_ino
+    t->items[2] = MP_OBJ_NEW_SMALL_INT(0); // st_dev
+    t->items[3] = MP_OBJ_NEW_SMALL_INT(0); // st_nlink
+    t->items[4] = MP_OBJ_NEW_SMALL_INT(0); // st_uid
+    t->items[5] = MP_OBJ_NEW_SMALL_INT(0); // st_gid
+    t->items[6] = file_size;               // st_size
+    t->items[7] = MP_OBJ_NEW_SMALL_INT(0); // st_atime
+    t->items[8] = MP_OBJ_NEW_SMALL_INT(0); // st_mtime
+    t->items[9] = MP_OBJ_NEW_SMALL_INT(0); // st_ctime
+    return MP_OBJ_FROM_PTR(t);
+}
+MP_DEFINE_CONST_FUN_OBJ_2(mbfs_stat_obj, mbfs_stat);
+
 
 STATIC const mp_rom_map_elem_t mbfs_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_mount), MP_ROM_PTR(&mbfs_mount_obj) },
     { MP_ROM_QSTR(MP_QSTR_ilistdir), MP_ROM_PTR(&mbfs_ilistdir_obj) },
     { MP_ROM_QSTR(MP_QSTR_open), MP_ROM_PTR(&mbfs_open_obj) },
     { MP_ROM_QSTR(MP_QSTR_remove), MP_ROM_PTR(&mbfs_remove_obj) },
+    { MP_ROM_QSTR(MP_QSTR_stat), MP_ROM_PTR(&mbfs_stat_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(mbfs_locals_dict, mbfs_locals_dict_table);
 
