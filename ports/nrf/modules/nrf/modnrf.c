@@ -29,24 +29,14 @@
 #include "py/runtime.h"
 #include "hal/hal_nvmc.h"
 #include "extmod/vfs.h"
+#include "mpconfigboard.h"
 
 #if MICROPY_PY_NRF
-
-#include "mpconfigboard.h"
 
 extern byte _flash_user_start[];
 extern byte _flash_user_end[];
 
-#if defined(NRF51)
-#define FLASH_BLOCKSIZE (1024)
-#elif defined(NRF52)
-#define FLASH_BLOCKSIZE (4096)
-#else
-#error Unknown chip
-#endif
-
-#define FLASH_RESERVER_BLOCKS (1)
-#define FLASH_BLOCK_START ((uint32_t)_flash_user_start / FLASH_BLOCKSIZE + FLASH_RESERVER_BLOCKS)
+#define FLASH_BLOCK_START (((uint32_t)_flash_user_start + (HAL_NVMC_PAGESIZE-1)) / HAL_NVMC_PAGESIZE)
 
 
 mp_obj_t nrf_flashbdev_readblocks(mp_obj_t self_in, mp_obj_t n_in, mp_obj_t buf_in) {
@@ -54,7 +44,7 @@ mp_obj_t nrf_flashbdev_readblocks(mp_obj_t self_in, mp_obj_t n_in, mp_obj_t buf_
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_WRITE);
 
-    mp_int_t address = (FLASH_BLOCK_START + n) * FLASH_BLOCKSIZE;
+    mp_int_t address = (FLASH_BLOCK_START + n) * HAL_NVMC_PAGESIZE;
     byte *buf = bufinfo.buf;
     byte *p = (byte*)address;
     for (int i=0; i<bufinfo.len; i++) {
@@ -69,14 +59,18 @@ mp_obj_t nrf_flashbdev_writeblocks(mp_obj_t self_in, mp_obj_t n_in, mp_obj_t buf
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_READ);
 
-    mp_int_t address = (FLASH_BLOCK_START + n) * FLASH_BLOCKSIZE;
+    mp_int_t address = (FLASH_BLOCK_START + n) * HAL_NVMC_PAGESIZE;
     if (address & 0x3 || bufinfo.len & 0x3) {
         mp_raise_ValueError("invalid address or buffer length");
     }
 
     // TODO: erase all blocks, not just the first.
-    hal_nvmc_erase_page(address);
-    hal_nvmc_write_buffer(address, bufinfo.buf, bufinfo.len/4);
+    if (!hal_nvmc_erase_page(address)) {
+        mp_raise_ValueError("could not erase block");
+    }
+    if (!hal_nvmc_write_words((uint32_t*)address, bufinfo.buf, bufinfo.len/4)) {
+        mp_raise_ValueError("could not write block");
+    }
 
     return mp_const_none;
 }
@@ -86,13 +80,13 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_3(nrf_flashbdev_writeblocks_obj, nrf_flashbdev_wr
 mp_obj_t nrf_flashbdev_ioctl(mp_obj_t self_in, mp_obj_t op_in, mp_obj_t arg_in) {
     mp_int_t op = mp_obj_get_int(op_in);
     if (op == BP_IOCTL_SEC_COUNT) {
-        mp_int_t block_start = (uint32_t)_flash_user_start / FLASH_BLOCKSIZE + FLASH_RESERVER_BLOCKS;
-        mp_int_t block_end = (uint32_t)_flash_user_end / FLASH_BLOCKSIZE;
+        mp_int_t block_start = FLASH_BLOCK_START;
+        mp_int_t block_end = (uint32_t)_flash_user_end / HAL_NVMC_PAGESIZE;
         mp_int_t num_blocks = block_end - block_start;
         return MP_OBJ_NEW_SMALL_INT(num_blocks);
     }
     if (op == BP_IOCTL_SEC_SIZE) {
-        return MP_OBJ_NEW_SMALL_INT(FLASH_BLOCKSIZE);
+        return MP_OBJ_NEW_SMALL_INT(HAL_NVMC_PAGESIZE);
     }
     return mp_const_none;
 }

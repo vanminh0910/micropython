@@ -31,7 +31,30 @@
 
 #include "nrf.h"
 
-void hal_nvmc_erase_page(uint32_t pageaddr);
-void hal_nvmc_write_buffer(uint32_t pageaddr, uint32_t *buf, int len);
+// Erase a single page. The pageaddr is an address within the first page.
+bool hal_nvmc_erase_page(uint32_t pageaddr);
+
+// Write an array of 32-bit words to flash. The len parameter is the
+// number of words, not the number of bytes. Dest and buf must be aligned.
+bool hal_nvmc_write_words(uint32_t *dest, const uint32_t *buf, size_t len);
+
+// Write a byte to flash. May have any alignment.
+bool hal_nvmc_write_byte(byte *dest, byte b);
+
+// Write an (unaligned) byte buffer to flash.
+bool hal_nvmc_write_buffer(void *dest_in, const void *buf_in, size_t len);
+
+#if defined(NRF51)
+#define HAL_NVMC_PAGESIZE (1024)
+
+#elif defined(NRF52)
+#define HAL_NVMC_PAGESIZE (4096)
+#error NRF52 not yet implemented
+
+#else
+#error Unknown chip
+#endif
+
+#define HAL_NVMC_IS_PAGE_ALIGNED(addr) ((uint32_t)(addr) & (HAL_NVMC_PAGESIZE-1))
 
 #endif // HAL_NVMC_H__

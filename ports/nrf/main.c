@@ -49,6 +49,7 @@
 #include "spi.h"
 #include "i2c.h"
 #include "rtc.h"
+#include "mpconfigport.h"
 #if MICROPY_PY_MACHINE_HW_PWM
 #include "pwm.h"
 #endif
@@ -138,7 +139,11 @@ soft_reset:
 pin_init0();
 
 #if MICROPY_HW_HAS_BUILTIN_FLASH
-    // Setup builtin flash
+#if MICROPY_PY_UOS_MICROBITFS
+    // Setup builtin flash as microbit filesystem
+    do_str("import uos; uos.mount(uos.microbitfs, '/')", MP_PARSE_FILE_INPUT);
+#elif MICROPY_PY_NRF
+    // Setup builtin flash as FAT filesystem
     do_str("import uos, nrf\n" \
            "try:\n" \
            " uos.mount(nrf.flashbdev, '/')\n" \
@@ -146,6 +151,7 @@ pin_init0();
            " uos.VfsFat.mkfs(nrf.flashbdev)\n" \
            " uos.mount(nrf.flashbdev, '/')\n",
            MP_PARSE_FILE_INPUT);
+#endif
 #endif
 
 #if MICROPY_HW_HAS_SDCARD

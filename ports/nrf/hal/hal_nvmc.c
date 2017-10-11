@@ -28,17 +28,59 @@
 #include "mphalport.h"
 #include "hal_nvmc.h"
 
+#if BLUETOOTH_SD
+#include "ble_drv.h"
+#include "nrf_soc.h"
+#endif
+
 #ifdef HAL_NVMC_MODULE_ENABLED
 
-#if !NRF51
-#error NRF52 not yet implemented
-#endif
-
 #if BLUETOOTH_SD
-#error NVMC with SoftDevice not yet implemented
-#endif
 
-void hal_nvmc_erase_page(uint32_t pageaddr) {
+bool hal_nvmc_erase_page(uint32_t pageaddr) {
+    uint32_t result = sd_flash_page_erase(pageaddr / HAL_NVMC_PAGESIZE);
+    if (ble_drv_stack_enabled() == 1) {
+        // TODO wait for result
+        return result == NRF_SUCCESS;
+    } else {
+        return result == NRF_SUCCESS;
+    }
+}
+
+bool hal_nvmc_write_words(uint32_t *dest, const uint32_t *buf, size_t len) {
+    uint32_t result = sd_flash_write(dest, buf, len);
+    if (ble_drv_stack_enabled() == 1) {
+        // TODO wait for result
+        return result == NRF_SUCCESS;
+    } else {
+        return result == NRF_SUCCESS;
+    }
+}
+
+bool hal_nvmc_write_byte(byte *dest_in, byte b) {
+    uint32_t dest = (uint32_t)dest_in;
+    uint32_t dest_aligned = dest & ~3;
+
+    // Value to write - leave all bits that should not change at 0xff.
+    uint32_t value = 0xffffff00 | b;
+
+    // Rotate bits in value to an aligned position.
+    for (int i = dest - dest_aligned; i; i--) {
+        value = (value << 8) | 0xff;
+    }
+
+    uint32_t result = sd_flash_write((uint32_t*)dest_aligned, &value, 1);
+    if (ble_drv_stack_enabled() == 1) {
+        // TODO wait for result
+        return result == NRF_SUCCESS;
+    } else {
+        return result == NRF_SUCCESS;
+    }
+}
+
+#else // BLUETOOTH_SD
+
+bool hal_nvmc_erase_page(uint32_t pageaddr) {
     // Configure NVMC to erase a page.
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
     while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
@@ -50,9 +92,12 @@ void hal_nvmc_erase_page(uint32_t pageaddr) {
     // Switch back to read-only.
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
     while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
+
+    // Operation succeeded.
+    return true;
 }
 
-void hal_nvmc_write_buffer(uint32_t pageaddr, uint32_t *buf, int len) {
+bool hal_nvmc_write_words(uint32_t *dest, const uint32_t *buf, size_t len) {
     // Note that we're writing 32-bit integers, not bytes. Thus the 'real'
     // length of the buffer is len*4.
 
@@ -60,17 +105,85 @@ void hal_nvmc_write_buffer(uint32_t pageaddr, uint32_t *buf, int len) {
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
     while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
 
-    uint32_t *flashbuf = (uint32_t*)pageaddr;
-
     // Write all integers to flash.
     for (int i=0; i<len; i++) {
-        flashbuf[i] = buf[i];
+        dest[i] = buf[i];
         while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
     }
 
     // Switch back to read-only.
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
     while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
+
+    // Operation succeeded.
+    return true;
+}
+
+bool hal_nvmc_write_byte(byte *dest_in, byte b) {
+    // This code can probably be optimized.
+
+    // Configure NVMC so that writes are allowed (anywhere).
+    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
+
+    // According to the nRF51 RM (chapter 6), only word writes to
+    // word-aligned addresses are allowed.
+    // https://www.nordicsemi.com/eng/nordic/Products/nRF51822/nRF51-RM/62725
+    uint32_t dest = (uint32_t)dest_in;
+    uint32_t dest_aligned = dest & ~3;
+
+    // Value to write - leave all bits that should not change at 0xff.
+    uint32_t value = 0xffffff00 | b;
+
+    // Rotate bits in value to an aligned position.
+    for (int i = dest - dest_aligned; i; i--) {
+        value = (value << 8) | 0xff;
+    }
+
+    // Put the value at the right place.
+    *(uint32_t*)dest_aligned = value;
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
+
+    // Switch back to read-only.
+    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
+
+    // Operation succeeded.
+    return true;
+}
+
+#endif // BLUETOOTH_SD
+
+bool hal_nvmc_write_buffer(void *dest_in, const void *buf_in, size_t len) {
+    byte *dest = dest_in;
+    const byte *buf = buf_in;
+
+    // Write first bytes to align the buffer.
+    while (len && ((uint32_t)dest & 0b11)) {
+        hal_nvmc_write_byte(dest, *buf);
+        dest++;
+        buf++;
+        len--;
+    }
+
+    // Now the start of the buffer is aligned. Write as many words as
+    // possible, as that's much faster than writing bytes.
+    if (len / 4 && ((uint32_t)buf & 0b11) == 0) {
+        hal_nvmc_write_words((uint32_t*)dest, (const uint32_t*)buf, len/4);
+        dest += len & ~0b11;
+        buf  += len & ~0b11;
+        len &= 0b11;
+    }
+
+    // Write remaining unaligned bytes.
+    while (len) {
+        hal_nvmc_write_byte(dest, *buf);
+        dest++;
+        buf++;
+        len--;
+    }
+
+    return true;
 }
 
 #endif // HAL_NVMC_MODULE_ENABLED
