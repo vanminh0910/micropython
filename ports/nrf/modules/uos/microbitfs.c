@@ -134,7 +134,7 @@ STATIC void randomise_start_index(void) {
     NRF_RNG->TASKS_STOP = 1;
 }
 
-STATIC void microbit_filesystem_init(void) {
+void microbit_filesystem_init(void) {
     init_limits();
     randomise_start_index();
     file_chunk *base = first_page();
@@ -431,6 +431,17 @@ STATIC void microbit_file_close(file_descriptor_obj *fd) {
     fd->open = false;
 }
 
+mp_obj_t microbit_file_list(void) {
+    mp_obj_t res = mp_obj_new_list(0, NULL);
+    for (uint8_t index = 1; index <= chunks_in_file_system; index++) {
+        if (file_system_chunks[index].marker == FILE_START) {
+            mp_obj_t name = mp_obj_new_str(&file_system_chunks[index].header.filename[0], file_system_chunks[index].header.name_len, false);
+            mp_obj_list_append(res, name);
+        }
+    }
+    return res;
+}
+
 STATIC mp_obj_t microbit_file_size(mp_obj_t filename) {
     mp_uint_t name_len;
     const char *name = mp_obj_str_get_data(filename, &name_len);
@@ -448,6 +459,39 @@ STATIC mp_obj_t microbit_file_size(mp_obj_t filename) {
     }
     len += end_offset - offset;
     return mp_obj_new_int(len);
+}
+
+STATIC mp_uint_t file_read_byte(file_descriptor_obj *fd) {
+    if (file_system_chunks[fd->seek_chunk].next_chunk == UNUSED_CHUNK) {
+        uint8_t end_offset = file_system_chunks[fd->start_chunk].header.end_offset;
+        if (end_offset == UNUSED_CHUNK || fd->seek_offset == end_offset) {
+            return (mp_uint_t)-1;
+        }
+    }
+    mp_uint_t res = file_system_chunks[fd->seek_chunk].data[fd->seek_offset];
+    advance(fd, 1, false);
+    return res;
+}
+
+mp_lexer_t *mbfs_new_reader(const char *filename) {
+    file_descriptor_obj *fd = microbit_file_open(filename, strlen(filename), false, false);
+    if (fd == NULL) {
+        mp_raise_OSError(MP_ENOENT);
+    }
+    mp_reader_t reader;
+    reader.data = fd;
+    reader.readbyte = (mp_uint_t(*)(void*))file_read_byte;
+    reader.close = (void(*)(void*))microbit_file_close; // no-op
+    return mp_lexer_new(qstr_from_str(filename), reader);
+}
+
+mp_import_stat_t mbfs_import_stat(const char *path) {
+    uint8_t chunk = microbit_find_file(path, strlen(path));
+    if (chunk == FILE_NOT_FOUND) {
+        return MP_IMPORT_STAT_NO_EXIST;
+    } else {
+        return MP_IMPORT_STAT_FILE;
+    }
 }
 
 STATIC mp_obj_t mbfs_file_name(mp_obj_t self) {
@@ -543,6 +587,8 @@ STATIC mp_obj_t mbfs_ilistdir(size_t n_args, const mp_obj_t *args) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mbfs_ilistdir_obj, 1, 2, mbfs_ilistdir);
 
+MP_DEFINE_CONST_FUN_OBJ_0(mbfs_listdir_obj, microbit_file_list);
+
 STATIC mp_obj_t microbit_file_writable(mp_obj_t self) {
     return mp_obj_new_bool(((file_descriptor_obj *)self)->writable);
 }
@@ -590,7 +636,7 @@ const mp_obj_type_t mbfs_fileio_type = {
 };
 
 // From fileobj.c
-STATIC mp_obj_t mbfs_open(size_t n_args, const mp_obj_t *args) {
+mp_obj_t mbfs_open(size_t n_args, const mp_obj_t *args) {
     /// -1 means default; 0 explicitly false; 1 explicitly true.
     int read = -1;
     int text = -1;

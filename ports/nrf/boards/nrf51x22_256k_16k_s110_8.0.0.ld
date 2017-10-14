@@ -8,8 +8,8 @@ MEMORY
 {
     FLASH (rx)      : ORIGIN = 0x00000000, LENGTH = 0x040000 /* entire flash, 256 KiB */
     FLASH_ISR (rx)  : ORIGIN = 0x00018000, LENGTH = 0x000400 /* sector 0, 1 KiB */
-    FLASH_TEXT (rx) : ORIGIN = 0x00018400, LENGTH = 0x025c00 /* 151 KiB */
-    FLASH_USER (rw) : ORIGIN = 0x0003e000, LENGTH = 0x002000 /* 8 KiB */
+    FLASH_TEXT (rx) : ORIGIN = 0x00018400, LENGTH = 0x020400 /* 129 KiB */
+    FLASH_USER (rw) : ORIGIN = 0x00038800, LENGTH = 0x007800 /* 30 KiB */
     RAM (xrw)       : ORIGIN = 0x20002000, LENGTH = 0x002000 /* 8 KiB */
 }
 

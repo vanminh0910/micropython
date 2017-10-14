@@ -142,6 +142,7 @@ soft_reset:
 pin_init0();
 
 #if MICROPY_HW_HAS_BUILTIN_FLASH
+#if MICROPY_VFS
 #if MICROPY_PY_UOS_MICROBITFS
     // Setup builtin flash as microbit filesystem
     const mp_obj_t meth[] = {
@@ -160,6 +161,9 @@ pin_init0();
            " uos.VfsFat.mkfs(nrf.flashbdev)\n" \
            " uos.mount(nrf.flashbdev, '/')\n",
            MP_PARSE_FILE_INPUT);
+#endif
+#elif MICROPY_PY_UOS_MICROBITFS
+    microbit_filesystem_init();
 #endif
 #endif
 
@@ -240,6 +244,7 @@ pin_init0();
 }
 
 #if !MICROPY_VFS
+#if !MICROPY_PY_UOS_MICROBITFS
 mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
     mp_raise_OSError(MP_ENOENT);
 }
@@ -252,6 +257,38 @@ STATIC mp_obj_t mp_builtin_open(size_t n_args, const mp_obj_t *args, mp_map_t *k
     mp_raise_OSError(MP_EPERM);
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_open_obj, 1, mp_builtin_open);
+
+#else
+mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
+    return mbfs_new_reader(filename);
+}
+
+mp_import_stat_t mp_import_stat(const char *path) {
+    return mbfs_import_stat(path);
+}
+
+STATIC mp_obj_t mp_builtin_open(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_file, ARG_mode, ARG_encoding };
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_file, MP_ARG_OBJ | MP_ARG_REQUIRED, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
+        { MP_QSTR_mode, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_QSTR(MP_QSTR_r)} },
+    };
+
+    // parse args
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    // Wrap it for mbfs_open
+    // TODO make this nicer
+    mp_obj_t open_args[] = {
+        NULL,
+        args[ARG_file].u_obj,
+        args[ARG_mode].u_obj,
+    };
+    return mbfs_open(n_args+1, open_args);
+}
+MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_open_obj, 0, mp_builtin_open);
+#endif
 #endif
 
 void HardFault_Handler(void)

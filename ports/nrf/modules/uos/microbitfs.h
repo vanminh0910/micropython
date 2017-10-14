@@ -27,6 +27,7 @@
 #define __MICROPY_INCLUDED_FILESYSTEM_H__
 
 #include "py/obj.h"
+#include "py/lexer.h"
 
 typedef struct _file_descriptor_obj {
     mp_obj_base_t base;
@@ -91,5 +92,11 @@ typedef struct {
 } mbfs_obj_t;
 
 extern const mbfs_obj_t mbfs_obj;
+
+mp_obj_t mbfs_open(size_t n_args, const mp_obj_t *args);
+void microbit_filesystem_init(void);
+MP_DECLARE_CONST_FUN_OBJ_0(mbfs_listdir_obj);
+mp_lexer_t *mbfs_new_reader(const char *filename);
+mp_import_stat_t mbfs_import_stat(const char *path);
 
 #endif // __MICROPY_INCLUDED_FILESYSTEM_H__
