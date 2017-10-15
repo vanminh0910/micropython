@@ -208,6 +208,10 @@ pin_init0();
            MP_PARSE_FILE_INPUT);
 #endif
 
+    if (mp_import_stat("main.py") == MP_IMPORT_STAT_FILE) {
+        pyexec_file("main.py");
+    }
+
     // Main script is finished, so now go into REPL mode.
     // The REPL mode can change, or it can request a soft reset.
     int ret_code = 0;
