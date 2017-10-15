@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include "modules/nrf/modnrf.h"
 #include "py/runtime.h"
 #include "hal/hal_nvmc.h"
 #include "extmod/vfs.h"
@@ -107,11 +108,7 @@ static const mp_obj_type_t nrf_flashbdev_type = {
     .locals_dict = (mp_obj_dict_t*)&nrf_flashbdev_locals_dict,
 };
 
-typedef struct {
-    mp_obj_base_t base;
-} nrf_flashbdev_obj_t;
-
-STATIC const nrf_flashbdev_obj_t nrf_flashbdev_obj = {
+const nrf_flashbdev_obj_t nrf_flashbdev_obj = {
     { &nrf_flashbdev_type },
 };
 
