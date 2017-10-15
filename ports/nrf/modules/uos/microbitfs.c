@@ -32,6 +32,7 @@
 
 #include "microbitfs.h"
 #include "hal/hal_nvmc.h"
+#include "hal/hal_rng.h"
 #include "py/nlr.h"
 #include "py/obj.h"
 #include "py/stream.h"
@@ -122,16 +123,7 @@ STATIC void init_limits(void) {
 }
 
 STATIC void randomise_start_index(void) {
-    uint8_t new_index; // 0 based index.
-    NRF_RNG->TASKS_START = 1;
-    // Wait for valid number
-    do {
-        NRF_RNG->EVENTS_VALRDY = 0;
-        while(NRF_RNG->EVENTS_VALRDY == 0);
-        new_index = NRF_RNG->VALUE&255;
-    } while (new_index >= chunks_in_file_system);
-    start_index = new_index + 1;  // Adjust index to 1 based.
-    NRF_RNG->TASKS_STOP = 1;
+    start_index = hal_rng_generate() / (chunks_in_file_system-1) + 1;
 }
 
 void microbit_filesystem_init(void) {
