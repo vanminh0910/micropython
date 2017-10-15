@@ -213,6 +213,10 @@ pin_init0();
            MP_PARSE_FILE_INPUT);
 #endif
 
+    // run boot.py and main.py if they exist.
+    if (mp_import_stat("boot.py") == MP_IMPORT_STAT_FILE) {
+        pyexec_file("boot.py");
+    }
     if (mp_import_stat("main.py") == MP_IMPORT_STAT_FILE) {
         pyexec_file("main.py");
     }
