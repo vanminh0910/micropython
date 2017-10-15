@@ -150,7 +150,8 @@ STATIC const mp_rom_map_elem_t os_module_globals_table[] = {
 
     { MP_ROM_QSTR(MP_QSTR_sync), MP_ROM_PTR(&mod_os_sync_obj) },
 #elif MICROPY_PY_UOS_MICROBITFS
-    { MP_ROM_QSTR(MP_QSTR_listdir), MP_ROM_PTR(&mbfs_listdir_obj) },
+    { MP_ROM_QSTR(MP_QSTR_listdir), MP_ROM_PTR(&mbfs_uos_listdir_obj) },
+    { MP_ROM_QSTR(MP_QSTR_remove), MP_ROM_PTR(&mbfs_uos_remove_obj) },
 #endif
 
     /// \constant sep - separation character used in paths

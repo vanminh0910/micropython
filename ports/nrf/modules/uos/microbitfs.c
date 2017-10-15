@@ -524,6 +524,11 @@ STATIC mp_obj_t mbfs_remove(mp_obj_t self, mp_obj_t name) {
 }
 MP_DEFINE_CONST_FUN_OBJ_2(mbfs_remove_obj, mbfs_remove);
 
+STATIC mp_obj_t mbfs_uos_remove(mp_obj_t name) {
+    return microbit_remove(name);
+}
+MP_DEFINE_CONST_FUN_OBJ_1(mbfs_uos_remove_obj, mbfs_uos_remove);
+
 typedef struct {
     mp_obj_base_t base;
     mp_fun_1_t iternext;
@@ -587,7 +592,7 @@ STATIC mp_obj_t mbfs_ilistdir(size_t n_args, const mp_obj_t *args) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mbfs_ilistdir_obj, 1, 2, mbfs_ilistdir);
 
-MP_DEFINE_CONST_FUN_OBJ_0(mbfs_listdir_obj, microbit_file_list);
+MP_DEFINE_CONST_FUN_OBJ_0(mbfs_uos_listdir_obj, microbit_file_list);
 
 STATIC mp_obj_t microbit_file_writable(mp_obj_t self) {
     return mp_obj_new_bool(((file_descriptor_obj *)self)->writable);

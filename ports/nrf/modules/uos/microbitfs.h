@@ -95,7 +95,8 @@ extern const mbfs_obj_t mbfs_obj;
 
 mp_obj_t mbfs_open(size_t n_args, const mp_obj_t *args);
 void microbit_filesystem_init(void);
-MP_DECLARE_CONST_FUN_OBJ_0(mbfs_listdir_obj);
+MP_DECLARE_CONST_FUN_OBJ_0(mbfs_uos_listdir_obj);
+MP_DECLARE_CONST_FUN_OBJ_1(mbfs_uos_remove_obj);
 mp_lexer_t *mbfs_new_reader(const char *filename);
 mp_import_stat_t mbfs_import_stat(const char *path);
 
