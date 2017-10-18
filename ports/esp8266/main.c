@@ -150,6 +150,7 @@ void __assert(const char *file, int line, const char *expr) {
 #define PAGE_NUM(p) (FLASH_ADDR(p) / PAGESIZE)
 
 STATIC uint32_t *next_word_addr = 0;
+extern uint32_t _firmware_size[];
 
 STATIC void flash_init() {
     // Find the address of the first page after the ROM end.
@@ -210,6 +211,13 @@ STATIC void write_chunk(uint32_t *words, uint32_t *begin, uint32_t *end) {
 void *mp_flash_write_words(uint32_t *words, size_t len) {
     uint32_t *start_addr = next_word_addr;
     uint32_t *end_addr = next_word_addr + len;
+
+    if (FLASH_ADDR(end_addr) > (uint32_t)_firmware_size) {
+        // _firmware_size really refers to the first flash address that is
+        // used by the filesystem. So we can use the area between
+        // _irom0_text_end and _firmware_size.
+        mp_raise_OSError(MP_ENOSPC);
+    }
 
     while (next_word_addr != end_addr) {
         // Calculate begin and end addresses of this chunk.
