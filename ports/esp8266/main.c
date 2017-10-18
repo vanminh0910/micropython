@@ -139,39 +139,90 @@ void __assert(const char *file, int line, const char *expr) {
     }
 }
 
-uint32_t *next_word_addr = 0;
+STATIC uint32_t *next_word_addr = 0;
 
-void *mp_flash_write_words(uint32_t *words, size_t len) {
-    if (next_word_addr == 0) {
-        next_word_addr = (void*)((((uint32_t)&_irom0_text_end) + MICROPY_FLASH_PAGESIZE - 1) & ~(uint32_t)(MICROPY_FLASH_PAGESIZE - 1));
+#define PAGESIZE (4096)
+#define BEGIN_PAGE(p) (void*)(((uintptr_t)p) & ~(uintptr_t)(PAGESIZE - 1))
+#define END_PAGE(p) (void*)((((uintptr_t)p) + PAGESIZE - 1) & ~(uintptr_t)(PAGESIZE - 1))
+#define NEXT_PAGE_START(p) (void*)((((uintptr_t)p) + PAGESIZE) & ~(uintptr_t)(PAGESIZE - 1))
+#define FLASH_ADDR(p) ((uint32_t)p - 0x40200000)
+#define PAGE_NUM(p) (FLASH_ADDR(p) / PAGESIZE)
+
+STATIC void write_chunk(uint32_t *words, uint32_t *begin, uint32_t *end) {
+    // Skip all words that are the same already.
+    while (begin != end && *begin == *words) {
+        begin++;
+        words++;
     }
 
-    if (len == 0) {
-        return next_word_addr;
+    if (begin == end) {
+        // Nothing to do.
+        return;
     }
 
-    uint32_t flash_addr = (uint32_t)next_word_addr - 0x40200000;
-
-    // Erase to be written pages
-    // this can be optimized
-    uint32_t flash_addr_top = flash_addr + len*4;
-    for (uint32_t addr=flash_addr; addr<flash_addr_top; addr+=4) {
-        uint32_t page = addr / MICROPY_FLASH_PAGESIZE;
-        if (addr == page * MICROPY_FLASH_PAGESIZE) { // new page
-            SpiFlashOpResult res = spi_flash_erase_sector(page);
-            if (res != SPI_FLASH_RESULT_OK) {
-                mp_raise_OSError(MP_EIO);
-                return NULL;
-            }
+    // Check whether the flash is cleared.
+    bool needs_erase = false;
+    for (uint32_t *p=begin; p<end; p++) {
+        if (*p != 0xffffffff) {
+            needs_erase = true;
         }
     }
 
-    SpiFlashOpResult res = spi_flash_write(flash_addr, words, len*4);
+    SpiFlashOpResult res;
+
+    if (needs_erase) {
+        // Backup existing data
+        uint32_t *page_start = BEGIN_PAGE(begin);
+        size_t existing_size = ((uint32_t)begin - (uint32_t)page_start) / 4;
+        uint32_t backup[existing_size];
+        for (uint32_t i=0; i<existing_size; i++) {
+            backup[i] = page_start[i];
+        }
+
+        // Erase to be written page
+        res = spi_flash_erase_sector(PAGE_NUM(page_start));
+        if (res != SPI_FLASH_RESULT_OK) {
+            mp_raise_OSError(MP_EIO);
+        }
+
+        // Write back backed-up data
+        res = spi_flash_write(FLASH_ADDR(page_start), backup, existing_size*4);
+        if (res != SPI_FLASH_RESULT_OK) {
+            mp_raise_OSError(MP_EIO);
+        }
+    }
+
+    // Now finally write the data.
+    res = spi_flash_write(FLASH_ADDR(begin), words, (uint32_t)end - (uint32_t)begin);
     if (res != SPI_FLASH_RESULT_OK) {
         mp_raise_OSError(MP_EIO);
     }
+}
 
-    uint32_t *addr = next_word_addr;
-    next_word_addr += len;
-    return addr;
+void *mp_flash_write_words(uint32_t *words, size_t len) {
+    // Initialize - runs only once after reset.
+    // TODO: do this after a soft reset too.
+    if (next_word_addr == 0) {
+        // Find the address of the first page after the ROM.
+        next_word_addr = END_PAGE(&_irom0_text_end);
+    }
+
+    uint32_t *start_addr = next_word_addr;
+    uint32_t *end_addr = next_word_addr + len;
+
+    while (next_word_addr != end_addr) {
+        // Calculate begin and end addresses of this chunk.
+        uint32_t *end;
+        if ((uint32_t)next_word_addr / PAGESIZE != (uint32_t)end_addr / PAGESIZE) {
+            // area crosses page boundary
+            end = NEXT_PAGE_START(next_word_addr);
+        } else {
+            // area is within one page
+            end = end_addr;
+        }
+        write_chunk(words, next_word_addr, end);
+        next_word_addr = end;
+    }
+
+    return start_addr;
 }
