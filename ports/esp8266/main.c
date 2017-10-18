@@ -41,12 +41,15 @@
 
 STATIC char heap[36 * 1024];
 
+STATIC void flash_init();
+
 STATIC void mp_reset(void) {
     mp_stack_set_top((void*)0x40000000);
     mp_stack_set_limit(8192);
     mp_hal_init();
     gc_init(heap, heap + sizeof(heap));
     mp_init();
+    flash_init();
     mp_obj_list_init(mp_sys_path, 0);
     mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR_)); // current dir (or base dir of the script)
     mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR__slash_lib));
@@ -139,14 +142,19 @@ void __assert(const char *file, int line, const char *expr) {
     }
 }
 
-STATIC uint32_t *next_word_addr = 0;
-
 #define PAGESIZE (4096)
 #define BEGIN_PAGE(p) (void*)(((uintptr_t)p) & ~(uintptr_t)(PAGESIZE - 1))
 #define END_PAGE(p) (void*)((((uintptr_t)p) + PAGESIZE - 1) & ~(uintptr_t)(PAGESIZE - 1))
 #define NEXT_PAGE_START(p) (void*)((((uintptr_t)p) + PAGESIZE) & ~(uintptr_t)(PAGESIZE - 1))
 #define FLASH_ADDR(p) ((uint32_t)p - 0x40200000)
 #define PAGE_NUM(p) (FLASH_ADDR(p) / PAGESIZE)
+
+STATIC uint32_t *next_word_addr = 0;
+
+STATIC void flash_init() {
+    // Find the address of the first page after the ROM end.
+    next_word_addr = END_PAGE(&_irom0_text_end);
+}
 
 STATIC void write_chunk(uint32_t *words, uint32_t *begin, uint32_t *end) {
     // Skip all words that are the same already.
@@ -200,13 +208,6 @@ STATIC void write_chunk(uint32_t *words, uint32_t *begin, uint32_t *end) {
 }
 
 void *mp_flash_write_words(uint32_t *words, size_t len) {
-    // Initialize - runs only once after reset.
-    // TODO: do this after a soft reset too.
-    if (next_word_addr == 0) {
-        // Find the address of the first page after the ROM.
-        next_word_addr = END_PAGE(&_irom0_text_end);
-    }
-
     uint32_t *start_addr = next_word_addr;
     uint32_t *end_addr = next_word_addr + len;
 
