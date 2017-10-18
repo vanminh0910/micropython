@@ -37,4 +37,6 @@ mp_raw_code_t *mp_raw_code_load_file(const char *filename);
 void mp_raw_code_save(mp_raw_code_t *rc, mp_print_t *print);
 void mp_raw_code_save_file(mp_raw_code_t *rc, const char *filename);
 
+void *mp_flash_write_words(uint32_t *words, size_t len);
+
 #endif // MICROPY_INCLUDED_PY_PERSISTENTCODE_H

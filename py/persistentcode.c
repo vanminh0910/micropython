@@ -167,7 +167,11 @@ STATIC void load_bytecode_qstrs(mp_reader_t *reader, byte *ip, byte *ip_top) {
 STATIC mp_raw_code_t *load_raw_code(mp_reader_t *reader) {
     // load bytecode
     size_t bc_len = read_uint(reader);
-    byte *bytecode = m_new(byte, bc_len);
+    size_t bc_len32 = (bc_len + 3) & ~(size_t)3;
+    byte *bytecode = m_new(byte, bc_len32);
+    if (bc_len) {
+        ((uint32_t*)bytecode)[bc_len32/4 - 1] = 0;
+    }
     read_bytes(reader, bytecode, bc_len);
 
     // extract prelude
@@ -183,10 +187,15 @@ STATIC mp_raw_code_t *load_raw_code(mp_reader_t *reader) {
     ((byte*)ip2)[2] = source_file; ((byte*)ip2)[3] = source_file >> 8;
     load_bytecode_qstrs(reader, (byte*)ip, bytecode + bc_len);
 
+    // Store bytecode in flash
+    byte *bytecode_flash = mp_flash_write_words((uint32_t*)bytecode, bc_len32/4);
+    m_del(uint32_t, bytecode, bc_len32/4);
+
     // load constant table
     size_t n_obj = read_uint(reader);
     size_t n_raw_code = read_uint(reader);
-    mp_uint_t *const_table = m_new(mp_uint_t, prelude.n_pos_args + prelude.n_kwonly_args + n_obj + n_raw_code);
+    size_t ct_len = prelude.n_pos_args + prelude.n_kwonly_args + n_obj + n_raw_code;
+    mp_uint_t *const_table = m_new(mp_uint_t, ct_len);
     mp_uint_t *ct = const_table;
     for (size_t i = 0; i < prelude.n_pos_args + prelude.n_kwonly_args; ++i) {
         *ct++ = (mp_uint_t)MP_OBJ_NEW_QSTR(load_qstr(reader));
@@ -198,9 +207,13 @@ STATIC mp_raw_code_t *load_raw_code(mp_reader_t *reader) {
         *ct++ = (mp_uint_t)(uintptr_t)load_raw_code(reader);
     }
 
+    // Store const table in flash
+    mp_uint_t *ct_flash = mp_flash_write_words(const_table, ct_len);
+    m_del(mp_uint_t, const_table, ct_len);
+
     // create raw_code and return it
     mp_raw_code_t *rc = mp_emit_glue_new_raw_code();
-    mp_emit_glue_assign_bytecode(rc, bytecode, bc_len, const_table,
+    mp_emit_glue_assign_bytecode(rc, bytecode_flash, bc_len, ct_flash,
         #if MICROPY_PERSISTENT_CODE_SAVE
         n_obj, n_raw_code,
         #endif

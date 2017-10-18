@@ -37,6 +37,7 @@
 #include "lib/utils/pyexec.h"
 #include "gccollect.h"
 #include "user_interface.h"
+#include "py/persistentcode.h"
 
 STATIC char heap[36 * 1024];
 
@@ -136,4 +137,41 @@ void __assert(const char *file, int line, const char *expr) {
     printf("Assertion '%s' failed, at file %s:%d\n", expr, file, line);
     for (;;) {
     }
+}
+
+uint32_t *next_word_addr = 0;
+
+void *mp_flash_write_words(uint32_t *words, size_t len) {
+    if (next_word_addr == 0) {
+        next_word_addr = (void*)((((uint32_t)&_irom0_text_end) + MICROPY_FLASH_PAGESIZE - 1) & ~(uint32_t)(MICROPY_FLASH_PAGESIZE - 1));
+    }
+
+    if (len == 0) {
+        return next_word_addr;
+    }
+
+    uint32_t flash_addr = (uint32_t)next_word_addr - 0x40200000;
+
+    // Erase to be written pages
+    // this can be optimized
+    uint32_t flash_addr_top = flash_addr + len*4;
+    for (uint32_t addr=flash_addr; addr<flash_addr_top; addr+=4) {
+        uint32_t page = addr / MICROPY_FLASH_PAGESIZE;
+        if (addr == page * MICROPY_FLASH_PAGESIZE) { // new page
+            SpiFlashOpResult res = spi_flash_erase_sector(page);
+            if (res != SPI_FLASH_RESULT_OK) {
+                mp_raise_OSError(MP_EIO);
+                return NULL;
+            }
+        }
+    }
+
+    SpiFlashOpResult res = spi_flash_write(flash_addr, words, len*4);
+    if (res != SPI_FLASH_RESULT_OK) {
+        mp_raise_OSError(MP_EIO);
+    }
+
+    uint32_t *addr = next_word_addr;
+    next_word_addr += len;
+    return addr;
 }
