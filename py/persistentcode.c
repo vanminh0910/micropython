@@ -213,15 +213,14 @@ STATIC mp_raw_code_t *load_raw_code_bytecode(mp_reader_t *reader) {
 
 #if MICROPY_PERSISTENT_NATIVE
 mp_raw_code_t *load_raw_code_native(mp_reader_t *reader) {
-    byte header[11];
-    read_bytes(reader, header, 11);
-    if (header[0] != MP_PERSISTENT_ARCH_CURRENT) {
+    byte arch = reader->readbyte(reader->data);
+    if (arch != MP_PERSISTENT_ARCH_CURRENT) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, ".mpy has wrong arch"));
     }
-    uint num_qstrs = header[1] | (header[2] << 8);
+    uint num_qstrs = read_uint(reader);
 
     // load machine code
-    mp_uint_t len = header[3] | (header[4] << 8);
+    mp_uint_t len = read_uint(reader);
     void *data;
     size_t alloc;
     MP_PLAT_ALLOC_EXEC(len, &data, &alloc);
