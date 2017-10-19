@@ -24,16 +24,28 @@ def to_uint(n):
     b[-1] &= 0x7f # clear high bit: it's the last byte
     return bytes(b)
 
+def align(n, a):
+    return (n + a - 1) // a * a
+
 def process_file(filename):
     with open(filename, 'rb') as f:
         header = f.read(6)
         num_qstrs = struct.unpack('H', f.read(2))[0]
-        data = f.read()
+        qstr_strings_len = struct.unpack('Q', f.read(8))[0]
+        qstr_buffer_len = align(qstr_strings_len, 8)
+        qstrbuf = f.read(qstr_buffer_len)[:qstr_strings_len]
+        text = f.read()
+    qstrs = qstrbuf.rstrip('\0').split(b'\0')
+    if len(qstrs) != num_qstrs:
+        raise ValueError('expected len(qstrs) == num_qstrs')
     with open(filename, 'wb') as f:
         f.write(header)
         f.write(to_uint(num_qstrs))
-        f.write(to_uint(len(data)))
-        f.write(data)
+        for qstr in qstrs:
+            f.write(to_uint(len(qstr)))
+            f.write(qstr)
+        f.write(to_uint(len(text)))
+        f.write(text)
 
 if __name__ == '__main__':
     process_file(sys.argv[1])

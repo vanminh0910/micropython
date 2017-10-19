@@ -8,6 +8,11 @@ SECTIONS
     {
         . = ALIGN(4);
         KEEP(*(.mpyheader))
+        QUAD(_qstr_end - _qstr_start)
+        _qstr_start = .;
+        KEEP(*(.qstr))
+        _qstr_end = .;
+        . = ALIGN(8);
         KEEP(*(.mpytext))
         *(.text*)
         *(.rodata*)

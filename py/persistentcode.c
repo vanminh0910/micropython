@@ -217,7 +217,14 @@ mp_raw_code_t *load_raw_code_native(mp_reader_t *reader) {
     if (arch != MP_PERSISTENT_ARCH_CURRENT) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, ".mpy has wrong arch"));
     }
+
+    // load qstrs
     uint num_qstrs = read_uint(reader);
+    qstr *qstr_table = m_new0(qstr, num_qstrs);
+    qstr *q = qstr_table;
+    for (size_t i=0; i<num_qstrs; i++) {
+        *q++ = load_qstr(reader);
+    }
 
     // load machine code
     mp_uint_t len = read_uint(reader);
@@ -226,7 +233,7 @@ mp_raw_code_t *load_raw_code_native(mp_reader_t *reader) {
     MP_PLAT_ALLOC_EXEC(len, &data, &alloc);
     read_bytes(reader, data, len);
 
-    mp_persistent_native_data_t *per_nat_data = mp_new_persistent_native_data(num_qstrs);
+    mp_persistent_native_data_t *per_nat_data = mp_new_persistent_native_data(qstr_table);
 
     // create raw_code and return it
     mp_raw_code_t *rc = mp_emit_glue_new_raw_code();

@@ -14,6 +14,17 @@ enum {
     MP_LOCAL_QSTR_number_of,
 };
 
+__attribute__((section(".qstr")))
+struct {
+    #define QDEF(id, str) const char id[sizeof(str)];
+    QSTR_DEFINES
+    #undef QDEF
+} QSTR_VALUE = {
+    #define QDEF(id, str) str,
+    QSTR_DEFINES
+    #undef QDEF
+};
+
 STATIC mp_obj_t modx_add1(CONTEXT mp_obj_t x) {
     return RT(mp_binary_op)(MP_BINARY_OP_ADD, x, MP_OBJ_NEW_SMALL_INT(1));
 }
@@ -34,14 +45,6 @@ MP_PERSISTENT_NATIVE_HEADER
 
 MP_PERSISTENT_NATIVE_INIT
 void init(CONTEXT_ALONE) {
-    // create qstrs
-    {
-        qstr *q = pnd->qstr_table;
-        #define QDEF(id, str) *q++ = RT(qstr_from_str)(str);
-        QSTR_DEFINES
-        #undef QDEF
-    }
-
     // constants
     RT(mp_store_global)(QSTR(VAL1), CONST(_true));
     RT(mp_store_global)(QSTR(VAL2), MP_OBJ_NEW_SMALL_INT(123));

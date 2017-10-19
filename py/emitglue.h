@@ -47,7 +47,7 @@ typedef struct _mp_persistent_native_data_t {
     void *data;
 } mp_persistent_native_data_t;
 
-mp_persistent_native_data_t *mp_new_persistent_native_data(size_t num_qstrs);
+mp_persistent_native_data_t *mp_new_persistent_native_data(qstr *qstr_table);
 #endif
 
 typedef struct _mp_raw_code_t {
