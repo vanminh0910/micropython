@@ -47,12 +47,26 @@
 #define MAKE_FUN_VAR_BETWEEN(mn, mx, fun_name) RT(mp_obj_new_fun_extern)(false, mn, MP_OBJ_FUN_ARGS_MAX, fun_name, pnd)
 #define MAKE_FUN_KW(mn, fun_name) RT(mp_obj_new_fun_extern)(true, mn, MP_OBJ_FUN_ARGS_MAX, fun_name, pnd)
 
+void init(CONTEXT_ALONE);
+
 // The linker likes to align the text following this header, so we make
 // the header a nice multiple of 8 to prevent padding being inserted.
 // TODO: consolidate the first 4 bytes here with stuff in persistentcode.c
 #define MP_PERSISTENT_NATIVE_HEADER \
     __attribute__((section(".mpyheader"))) \
-    const byte header[8] = { \
+    const struct { \
+        char magic; \
+        char version; \
+        char feature_flags; \
+        char small_int_bits; \
+        char code_type; \
+        char arch; \
+        uint16_t num_qstrs; \
+        union { \
+            void *init; \
+            uint64_t pad1; /* make pointer 64-bit on all platforms */ \
+        }; \
+    } header = { \
         'M', \
         2, \
         ((MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE) << 0) \
@@ -60,7 +74,8 @@
         16, \
         MP_CODE_PERSISTENT_NATIVE, \
         MP_PERSISTENT_ARCH_CURRENT, \
-        (MP_LOCAL_QSTR_number_of & 0xff), (MP_LOCAL_QSTR_number_of >> 8), \
+        MP_LOCAL_QSTR_number_of, \
+        { init }, \
     };
 
 #define MP_PERSISTENT_NATIVE_INIT \

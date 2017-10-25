@@ -222,15 +222,50 @@ mp_raw_code_t *load_raw_code_native(mp_reader_t *reader) {
     // load machine code
     mp_uint_t len = read_uint(reader);
     void *data;
+    #ifdef MP_PLAT_COMMIT_EXEC
+    // MP_PLAT_ALLOC_EXEC isn't used
+    data = m_new(char, len);
+    #else
     size_t alloc;
     MP_PLAT_ALLOC_EXEC(len, &data, &alloc);
+    #endif
     read_bytes(reader, data, len);
+
+    #ifdef MP_PLAT_COMMIT_EXEC
+    // Retrieve the address where the data will be stored, but don't store
+    // the data just yet.
+    uintptr_t data_address = (uintptr_t)MP_PLAT_COMMIT_EXEC(data, 0);
+    #else
+    uintptr_t data_address = (uintptr_t)data;
+    #endif
+
+    #if defined(__xtensa__)
+    // apply relocations
+    size_t num_relocs = read_uint(reader);
+    for (size_t i = 0; i < num_relocs; i++) {
+        size_t reloc = read_uint(reader);
+        ((uint32_t*)data)[reloc] += data_address;
+    }
+
+    const size_t start_offset = read_uint(reader);
+    #else
+    (void)data_address; // dummy, keep the compiler happy
+    const size_t start_offset = 0; // default
+    #endif
+
+    #ifdef MP_PLAT_COMMIT_EXEC
+    byte *data_new = MP_PLAT_COMMIT_EXEC(data, len);
+    if (data_new != data) {
+        m_del(char, data, len);
+    }
+    data = data_new;
+    #endif
 
     mp_persistent_native_data_t *per_nat_data = mp_new_persistent_native_data(num_qstrs);
 
     // create raw_code and return it
     mp_raw_code_t *rc = mp_emit_glue_new_raw_code();
-    mp_emit_glue_assign_persistent_native(rc, data, per_nat_data, 0);
+    mp_emit_glue_assign_persistent_native(rc, (byte*)data + start_offset, per_nat_data, 0);
     return rc;
 }
 #endif

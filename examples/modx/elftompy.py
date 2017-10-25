@@ -123,9 +123,38 @@ class Section:
                 dots.append(i)
         return strings
 
+    def read_relocations(self, f, header):
+        if self.sh_type != SHT_RELA:
+            raise ValueError('not a .rela section')
+        f.seek(self.sh_offset)
+        relocations = []
+        if header.is_64bit:
+            for i in range(self.sh_size // 24):
+                relocations.append(Relocation(struct.unpack('QQq', f.read(24)), header))
+        else:
+            for i in range(self.sh_size // 12):
+                relocations.append(Relocation(struct.unpack('IIi', f.read(12)), header))
+        return relocations
+
     def read(self, f):
         f.seek(self.sh_offset)
         return f.read(self.sh_size)
+
+class Relocation:
+    def __init__(self, relocation, header):
+        self.data = relocation
+        self.r_offset = relocation[0]
+        self.r_info   = relocation[1]
+        if header.is_64bit:
+            self.r_sym    = self.r_info >> 32
+            self.r_type   = self.r_info & 0xffffffff
+        else:
+            self.r_sym    = self.r_info >> 8
+            self.r_type   = self.r_info & 0xff
+        if len(relocation) >= 3:
+            self.r_addend = relocation[2]
+        else:
+            self.r_addend = None
 
 def read_sections(f, header):
     f.seek(header.e_shoff)
@@ -163,16 +192,54 @@ def create_mpy(elfpath, mpypath):
     sections = read_sections(f, header)
 
     section_all = bytearray(sections['.all'].read(f))
+    header_len = 16
 
-    header_len = 8
-    mpyheader, num_qstrs = struct.unpack('6sH', section_all[:header_len])
+    relocations = None
+
+    if header.e_machine == ISA_XTENSA:
+        relocations = []
+        # Useful resources:
+        # http://elixir.free-electrons.com/linux/latest/source/arch/xtensa/kernel/module.c#L72
+        # http://wiki.linux-xtensa.org/index.php/ELF_Relocation_Notes
+        # http://0x04.net/~mwk/doc/xtensa.pdf
+        for r in sections['.rela.all'].read_relocations(f, header):
+            if r.r_type == R_XTENSA_32:
+                if r.r_offset % 4 != 0:
+                    raise ValueError('relocation offset isn\'t aligned')
+                # addend appears to be off, so we have to use what's already
+                # stored
+                value = struct.unpack('I', section_all[r.r_offset:r.r_offset+4])[0]
+                value -= header_len # value is now relative to start of data, not the .all section
+                # insert relative relocation
+                section_all[r.r_offset:r.r_offset+4] = struct.pack('I', value)
+                if r.r_offset >= header_len:
+                    relocations.append((r.r_offset - header_len) // 4)
+                else:
+                    pass # init() pointer
+            elif r.r_type == R_XTENSA_SLOT0_OP:
+                # appears to be unnecessary (L32R, jumps, etc.)
+                continue
+            else:
+                print('WARNING: unknown relocation type %d' % r.r_type)
+
+    mpyheader, num_qstrs, init_address = struct.unpack('6sHQ', section_all[:header_len])
     data = section_all[header_len:]
+
+    init_offset = None
+    if header.e_machine == ISA_XTENSA:
+        init_offset = init_address
 
     with open(mpypath, 'wb') as f:
         f.write(mpyheader)
         f.write(to_uint(num_qstrs))
         f.write(to_uint(len(data)))
         f.write(data)
+        if relocations is not None:
+            f.write(to_uint(len(relocations)))
+            for r in relocations:
+                f.write(to_uint(r))
+        if init_offset is not None:
+            f.write(to_uint(init_offset))
 
 if __name__ == '__main__':
     elfpath = sys.argv[1]

@@ -101,6 +101,7 @@ mp_obj_t mp_make_closure_from_raw_code(const mp_raw_code_t *rc, mp_uint_t n_clos
 #define MP_PERSISTENT_ARCH_M0           (3)
 #define MP_PERSISTENT_ARCH_M4           (4)
 #define MP_PERSISTENT_ARCH_ARM          (5)
+#define MP_PERSISTENT_ARCH_ESP8266      (6)
 
 // Reference for GCC defines:
 // http://micro-os-plus.github.io/develop/predefined-macros/
@@ -115,6 +116,8 @@ mp_obj_t mp_make_closure_from_raw_code(const mp_raw_code_t *rc, mp_uint_t n_clos
 #define MP_PERSISTENT_ARCH_CURRENT (MP_PERSISTENT_ARCH_M4)
 #elif defined(__arm__) && !defined(__thumb__)
 #define MP_PERSISTENT_ARCH_CURRENT (MP_PERSISTENT_ARCH_ARM)
+#elif defined(__xtensa__)
+#define MP_PERSISTENT_ARCH_CURRENT (MP_PERSISTENT_ARCH_ESP8266)
 #else
 #error unknown machine architecture
 #endif
