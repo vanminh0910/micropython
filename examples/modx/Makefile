@@ -29,8 +29,7 @@ clean:
 	$(RM) -rf $(BUILD)
 
 $(BUILD)/modx.mpy: $(BUILD)/modx.elf
-	$(OBJCOPY) -O binary -j .all $< $@
-	$(PYTHON) elftompy.py $@
+	$(PYTHON) elftompy.py $< $@
 
 $(BUILD)/modx.elf: $(BUILD)/modx.o
 	$(LD) -T persistnative.ld -o $@ $<
