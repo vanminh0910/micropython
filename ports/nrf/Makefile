@@ -194,9 +194,20 @@ OBJ += $(BUILD)/pins_gen.o
 $(BUILD)/$(FATFS_DIR)/ff.o: COPT += -Os
 $(filter $(PY_BUILD)/../extmod/vfs_fat_%.o, $(PY_O)): COPT += -Os
 
-.phony: all flash sd binary hex
+.PHONY: all flash sd binary hex bootloader
 
 all: binary hex
+
+bootloader: $(BUILD)/bootloader.hex
+
+$(BUILD)/bootloader.hex: $(BUILD)/bootloader.elf
+	$(OBJCOPY) -O ihex $< $@
+
+$(BUILD)/bootloader.elf: bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup_$(MCU_SUB_VARIANT).c
+	$(ECHO) "CCLD $@"
+	$(Q)$(MKDIR) -p $(BUILD)
+	$(Q)$(CC) $(CFLAGS) -T bootloader/nrf51x22_256k_16k_s110_8.0.0.ld -Wl,--gc-sections -flto -o $@ bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup_$(MCU_SUB_VARIANT).c
+	$(Q)$(SIZE) $@
 
 OUTPUT_FILENAME = firmware
 

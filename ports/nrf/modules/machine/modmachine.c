@@ -55,6 +55,14 @@
 #include "rtc.h"
 #endif
 
+#include "nrf_sdm.h"
+#if BLUETOOTH_SD
+#include "ble_drv.h"
+#define BLUETOOTH_STACK_ENABLED() (ble_drv_stack_enabled())
+#else
+#define BLUETOOTH_STACK_ENABLED() (0)
+#endif // BLUETOOTH_SD
+
 #define PYB_RESET_HARD      (0)
 #define PYB_RESET_WDT       (1)
 #define PYB_RESET_SOFT      (2)
@@ -149,6 +157,20 @@ STATIC mp_obj_t machine_soft_reset(void) {
 }
 MP_DEFINE_CONST_FUN_OBJ_0(machine_soft_reset_obj, machine_soft_reset);
 
+STATIC mp_obj_t machine_bootloader(void) {
+    // Set GPREGRET to a value different from 0 to signal the bootloader
+    // that it should enter DFU mode.
+    if (BLUETOOTH_STACK_ENABLED()) {
+        sd_power_gpregret_set(1); // set lowest bit to 1
+        sd_nvic_SystemReset();
+    } else {
+        NRF_POWER->GPREGRET = 1; // set byte value to 1
+        NVIC_SystemReset();
+    }
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_0(machine_bootloader_obj, machine_bootloader);
+
 STATIC mp_obj_t machine_sleep(void) {
     __WFE();
     return mp_const_none;
@@ -192,6 +214,7 @@ STATIC const mp_rom_map_elem_t machine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_info),               MP_ROM_PTR(&machine_info_obj) },
     { MP_ROM_QSTR(MP_QSTR_reset),              MP_ROM_PTR(&machine_reset_obj) },
     { MP_ROM_QSTR(MP_QSTR_soft_reset),         MP_ROM_PTR(&machine_soft_reset_obj) },
+    { MP_ROM_QSTR(MP_QSTR_bootloader),         MP_ROM_PTR(&machine_bootloader_obj) },
     { MP_ROM_QSTR(MP_QSTR_enable_irq),         MP_ROM_PTR(&machine_enable_irq_obj) },
     { MP_ROM_QSTR(MP_QSTR_disable_irq),        MP_ROM_PTR(&machine_disable_irq_obj) },
 #if MICROPY_HW_ENABLE_RNG
