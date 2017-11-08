@@ -24,6 +24,27 @@ else
 	include boards/$(BOARD)/mpconfigboard_$(SD_LOWER).mk
 
 	include drivers/bluetooth/bluetooth_common.mk
+
+	# Build with DFU enabled if the SD is also enabled.
+	DFU ?= mbr
+endif
+
+ifeq ($(DFU),)
+DFU := none
+else ifeq ($(DFU),mbr)
+else ifeq ($(DFU),bootloader)
+else
+$(error DFU type unknown: $(DFU) (must be dfu, mbr or none))
+endif
+
+ifneq ($(DFU),none)
+ifeq ($(SD),s110)
+BOOTLOADERLD = dfu/nrf51x22_256k_16k_s110_8.0.0_$(DFU).ld
+PAGESIZE = 1024
+else ifeq ($(SD),s132)
+BOOTLOADERLD = dfu/nrf52_512k_s132_3.0.0_$(DFU).ld
+PAGESIZE = 4096
+endif
 endif
 
 ifeq ($(shell test -e boards/$(BOARD)/modules/boardmodules.mk && echo -n yes),yes)
@@ -78,6 +99,7 @@ CFLAGS += -fno-strict-aliasing
 CFLAGS += -fstack-usage
 CFLAGS += -Iboards/$(BOARD)
 CFLAGS += -DNRF5_HAL_H='<$(MCU_VARIANT)_hal.h>'
+CFLAGS += -DDFU_TYPE_$(DFU)
 CFLAGS += -flto
 
 LDFLAGS = $(CFLAGS)
@@ -206,6 +228,20 @@ SRC_C += \
 	device/$(MCU_VARIANT)/system_$(MCU_SUB_VARIANT).c \
 	device/$(MCU_VARIANT)/startup_$(MCU_SUB_VARIANT).c \
 
+DFU_SRC_C := $(addprefix dfu/,\
+	 dfu.c \
+	 dfu_uart.c \
+	 dfu_ble.c \
+	 startup.c \
+	 )
+
+DFU_OBJ := $(addprefix $(BUILD)/, $(DFU_SRC_C:.c=.o))
+
+# Create build directories and isr-vector.h before compiling DFU_OBJ files.
+$(DFU_OBJ): | $(BUILD)/dfu
+$(DFU_OBJ): | $(HEADER_BUILD)
+$(DFU_OBJ): | $(HEADER_BUILD)/isr-vector.h
+
 FROZEN_MPY_PY_FILES := $(shell find -L $(FROZEN_MPY_DIR) -type f -name '*.py')
 FROZEN_MPY_MPY_FILES := $(addprefix $(BUILD)/,$(FROZEN_MPY_PY_FILES:.py=.mpy))
 
@@ -218,51 +254,66 @@ OBJ += $(BUILD)/pins_gen.o
 $(BUILD)/$(FATFS_DIR)/ff.o: COPT += -Os
 $(filter $(PY_BUILD)/../extmod/vfs_fat_%.o, $(PY_O)): COPT += -Os
 
-.phony: all flash sd binary hex
+.PHONY: all flash sd binary hex
 
 all: binary hex
 
-OUTPUT_FILENAME = firmware
+$(BUILD)/dfu:
+	$(Q)$(MKDIR) -p $@
 
-## Create binary .bin file from the .out file
-binary: $(BUILD)/$(OUTPUT_FILENAME).bin
+$(BUILD)/dfu_$(DFU).hex: $(BUILD)/dfu_$(DFU).elf
+	$(ECHO) "HEX $@"
+	$(Q)$(OBJCOPY) -O ihex $< $@
 
-$(BUILD)/$(OUTPUT_FILENAME).bin: $(BUILD)/$(OUTPUT_FILENAME).elf
-	$(OBJCOPY) -O binary $< $@
+$(HEADER_BUILD)/isr-vector.h:
+	$(Q)$(PYTHON) dfu/extract-isr-vector.py "$(SOFTDEV_HEX)" "$@" 54
 
-## Create binary .hex file from the .out file
-hex: $(BUILD)/$(OUTPUT_FILENAME).hex
+$(BUILD)/dfu_$(DFU).elf: $(DFU_OBJ)
+	$(ECHO) "LINK $@"
+	$(Q)$(CC) $(CFLAGS) -T $(BOOTLOADERLD) -Wl,--gc-sections -flto -o $@ $(DFU_OBJ)
+	$(Q)$(SIZE) $@
 
-$(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).elf
+## Create binary .bin file from the .hex file
+binary: $(BUILD)/firmware.bin
+
+$(BUILD)/firmware.bin: $(BUILD)/firmware.hex
+	$(OBJCOPY) -O binary -I ihex $< $@
+
+## Create binary .hex file from the .elf file
+hex: $(BUILD)/firmware.hex
+
+$(BUILD)/firmware.hex: $(SOFTDEV_HEX) $(BUILD)/dfu_$(DFU).hex $(BUILD)/application.hex
+	$(PYTHON) dfu/mergehex.py --pagesize $(PAGESIZE) $@ $^
+
+$(BUILD)/application.hex: $(BUILD)/application.elf
 	$(OBJCOPY) -O ihex $< $@
 
 FLASHER ?=
 
 ifeq ($(FLASHER),)
 
-flash: $(BUILD)/$(OUTPUT_FILENAME).hex
+flash: $(BUILD)/application.hex
 	nrfjprog --program $< --sectorerase -f $(MCU_VARIANT)
 	nrfjprog --reset -f $(MCU_VARIANT)
 
-sd: $(BUILD)/$(OUTPUT_FILENAME).hex
+sd: $(BUILD)/firmware.hex
 	nrfjprog --eraseall -f $(MCU_VARIANT)
-	nrfjprog --program $(SOFTDEV_HEX) -f $(MCU_VARIANT)
-	nrfjprog --program $< --sectorerase -f $(MCU_VARIANT)
+	nrfjprog --program $(BUILD)/firmware.hex -f $(MCU_VARIANT)
 	nrfjprog --reset -f $(MCU_VARIANT)
 
 else ifeq ($(FLASHER), pyocd)
 
-flash: $(BUILD)/$(OUTPUT_FILENAME).hex
+flash: $(BUILD)/application.hex
 	pyocd-flashtool -t $(MCU_VARIANT) $<
 
-sd: $(BUILD)/$(OUTPUT_FILENAME).hex
+sd: $(BUILD)/application.hex
 	pyocd-flashtool -t $(MCU_VARIANT) --chip_erase
 	pyocd-flashtool -t $(MCU_VARIANT) $(SOFTDEV_HEX)
 	pyocd-flashtool -t $(MCU_VARIANT) $<
 
 endif
 
-$(BUILD)/$(OUTPUT_FILENAME).elf: $(OBJ)
+$(BUILD)/application.elf: $(OBJ)
 	$(ECHO) "LINK $@"
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(OBJ) $(LIBS)
 	$(Q)$(SIZE) $@
