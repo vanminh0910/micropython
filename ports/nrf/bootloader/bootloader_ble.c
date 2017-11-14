@@ -27,6 +27,7 @@
 #define UUID_DFU_SERVICE      0x0001
 #define UUID_DFU_CHAR_INFO    0x0002
 #define UUID_DFU_CHAR_COMMAND 0x0003
+#define UUID_DFU_CHAR_BUFFER  0x0004
 
 static MBRCONST ble_uuid128_t uuid_base = {
     UUID_BASE,
@@ -132,7 +133,7 @@ static MBRCONST ble_gatts_attr_t attr_char_info = {
     .max_len   = sizeof(char_info_value),
 };
 
-static MBRCONST ble_gatts_attr_t attr_char_command = {
+static MBRCONST ble_gatts_attr_t attr_char_write = {
     .p_uuid    = &uuid,
     .p_attr_md = (ble_gatts_attr_md_t*)&attr_md_writeonly,
     .init_len  = 0,
@@ -156,7 +157,7 @@ static MBRCONST ble_gatts_char_md_t char_md_readonly = {
     .p_cccd_md         = NULL,
 };
 
-static MBRCONST ble_gatts_char_md_t char_md_writeonly = {
+static MBRCONST ble_gatts_char_md_t char_md_write_notify = {
     .char_props.broadcast      = 0,
     .char_props.read           = 0,
     .char_props.write_wo_resp  = 0,
@@ -171,7 +172,25 @@ static MBRCONST ble_gatts_char_md_t char_md_writeonly = {
     .p_cccd_md         = NULL,
 };
 
+#if PACKET_CHARACTERISTIC
+static MBRCONST ble_gatts_char_md_t char_md_write_wo_resp = {
+    .char_props.broadcast      = 0,
+    .char_props.read           = 0,
+    .char_props.write_wo_resp  = 1,
+    .char_props.write          = 0,
+    .char_props.notify         = 0,
+    .char_props.indicate       = 0,
+
+    .p_char_user_desc  = NULL,
+    .p_char_pf         = NULL,
+    .p_user_desc_md    = NULL,
+    .p_sccd_md         = NULL,
+    .p_cccd_md         = NULL,
+};
+#endif
+
 ble_gatts_char_handles_t char_command_handles;
+ble_gatts_char_handles_t char_buffer_handles;
 
 static uint16_t ble_command_conn_handle;
 
@@ -233,11 +252,22 @@ void ble_init(void) {
     // Add 'command' characteristic
     uuid.uuid = UUID_DFU_CHAR_COMMAND;
     if (sd_ble_gatts_characteristic_add(BLE_GATT_HANDLE_INVALID,
-                                        &char_md_writeonly,
-                                        &attr_char_command,
+                                        &char_md_write_notify,
+                                        &attr_char_write,
                                         &char_command_handles) != 0) {
         LOG("Can not add Characteristic.");
     }
+
+#if PACKET_CHARACTERISTIC
+    // Add 'buffer' characteristic
+    uuid.uuid = UUID_DFU_CHAR_BUFFER;
+    if (sd_ble_gatts_characteristic_add(BLE_GATT_HANDLE_INVALID,
+                                        &char_md_write_wo_resp,
+                                        &attr_char_write,
+                                        &char_buffer_handles) != 0) {
+        LOG("Can not add Characteristic.");
+    }
+#endif
 }
 
 
@@ -312,7 +342,6 @@ static void ble_evt_handler(ble_evt_t * p_ble_evt) {
         }
 
         case BLE_GATTS_EVT_WRITE: {
-            //LOG("ble: write");
             uint16_t  conn_handle = p_ble_evt->evt.gatts_evt.conn_handle;
             uint16_t  attr_handle = p_ble_evt->evt.gatts_evt.params.write.handle;
             uint16_t  data_len    = p_ble_evt->evt.gatts_evt.params.write.len;
@@ -331,6 +360,9 @@ static void ble_evt_handler(ble_evt_t * p_ble_evt) {
             if (attr_handle == char_command_handles.value_handle) {
                 ble_command_conn_handle = conn_handle;
                 handle_command(data_len, (ble_command_t*)data);
+            } else if (PACKET_CHARACTERISTIC && attr_handle == char_buffer_handles.value_handle) {
+                ble_command_conn_handle = conn_handle;
+                handle_buffer(data_len, data);
             }
             break;
         }
@@ -367,7 +399,7 @@ static void ble_evt_handler(ble_evt_t * p_ble_evt) {
             break;
 
         case BLE_EVT_TX_COMPLETE:
-            LOG("ble: tx complete");
+            //LOG("ble: tx complete");
             break;
 
         default: {

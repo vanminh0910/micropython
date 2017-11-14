@@ -10,8 +10,10 @@
 #define LOG(s)
 #endif
 
-#define INPUT_CHECKS      (1)
-#define ERROR_REPORTING   (1)
+#define INPUT_CHECKS           (1) // whether the received buffer is the correct length
+#define FLASH_PAGE_CHECKS      (1) // check that flash pages are within the app area
+#define ERROR_REPORTING        (1) // send error when something goes wrong (e.g. flash write fail)
+#define PACKET_CHARACTERISTIC  (1) // add a separate transport characteristic - improves speed but costs 32 bytes
 
 extern const uint32_t _stext[];
 
@@ -26,8 +28,8 @@ extern const uint32_t _stext[];
 
 #define COMMAND_RESET        (0x01) // do a reset
 #define COMMAND_ERASE_PAGE   (0x02) // start erasing this page
-#define COMMAND_ADD_BUFFER   (0x03) // add data to write buffer
-#define COMMAND_WRITE_BUFFER (0x04) // start writing this page and reset buffer
+#define COMMAND_WRITE_BUFFER (0x03) // start writing this page and reset buffer
+#define COMMAND_ADD_BUFFER   (0x04) // add data to write buffer
 #define COMMAND_PING         (0x10) // just ask a response (debug)
 #define COMMAND_START        (0x11) // start the app (debug, unreliable)
 
@@ -50,7 +52,7 @@ typedef union {
         uint8_t  command;
         uint8_t  flags; // or rather: padding
         uint16_t padding;
-        uint32_t buffer[4];
+        uint8_t  buffer[16];
     } buffer; // COMMAND_ADD_BUFFER
     struct {
         uint8_t  command;
@@ -61,5 +63,6 @@ typedef union {
 } ble_command_t;
 
 void handle_command(uint16_t data_len, ble_command_t *data);
+void handle_buffer(uint16_t data_len, uint8_t *data);
 
 void sd_evt_handler(uint32_t evt_id);

@@ -57,8 +57,8 @@ static void jump_to_app() {
 }
 
 
-uint32_t flash_buf[PAGE_SIZE/4];
-uint32_t *flash_buf_ptr;
+uint8_t flash_buf[PAGE_SIZE];
+uint8_t *flash_buf_ptr;
 
 void _start(void) {
 #if DEBUG
@@ -139,26 +139,34 @@ void handle_command(uint16_t data_len, ble_command_t *cmd) {
         } else if (err_code != 0) {
             LOG("! could not start erase of page");
         }
-    } else if (cmd->any.command == COMMAND_ADD_BUFFER) {
-        if (INPUT_CHECKS && data_len < 8) return;
-        if (INPUT_CHECKS && data_len % 4 != 0) return;
-        const uint32_t *in_start = cmd->buffer.buffer;
-        uint32_t *out_end = flash_buf_ptr + (data_len-4)/4;
-        if (INPUT_CHECKS && out_end > flash_buf + (PAGE_SIZE / 4)) {
-            return;
-        }
-        while (flash_buf_ptr != out_end) {
-            *flash_buf_ptr++ = *in_start++;
-        }
     } else if (cmd->any.command == COMMAND_WRITE_BUFFER) {
         LOG("command: do write");
-        if (sd_flash_write((uint32_t*)((uintptr_t)cmd->write.page * PAGE_SIZE), flash_buf, cmd->write.n_words) != 0) {
+#if FLASH_PAGE_CHECKS
+        if (cmd->write.page < APPLICATION_START_ADDR / PAGE_SIZE || (!BOOTLOADER_IN_MBR && cmd->write.page >= (uint32_t)BOOTLOADER_START_ADDR / PAGE_SIZE)) {
+            if (ERROR_REPORTING) {
+                ble_send_reply(1);
+            }
+            return;
+        }
+#endif
+        if (sd_flash_write((uint32_t*)((uintptr_t)cmd->write.page * PAGE_SIZE), (uint32_t*)flash_buf, cmd->write.n_words) != 0) {
             LOG("could not start page write");
             if (ERROR_REPORTING) {
                 ble_send_reply(1);
             }
         }
         flash_buf_ptr = flash_buf;
+#if !PACKET_CHARACTERISTIC
+    } else if (cmd->any.command == COMMAND_ADD_BUFFER) {
+        const uint8_t *in_start = cmd->buffer.buffer;
+        uint8_t *out_end = flash_buf_ptr + (data_len - 4);
+        if (INPUT_CHECKS && out_end > flash_buf + PAGE_SIZE) {
+            out_end = flash_buf + PAGE_SIZE;
+        }
+        while (flash_buf_ptr != out_end) {
+            *flash_buf_ptr++ = *in_start++;
+        }
+#endif
 #if DEBUG
     } else if (cmd->any.command == COMMAND_PING) {
         // Only for debugging
@@ -179,10 +187,21 @@ void handle_command(uint16_t data_len, ble_command_t *cmd) {
     }
 }
 
+void handle_buffer(uint16_t data_len, uint8_t *data) {
+    const uint8_t *in_start = data;
+    uint8_t *out_end = flash_buf_ptr + data_len;
+    if (INPUT_CHECKS && out_end > flash_buf + PAGE_SIZE) {
+        return;
+    }
+    while (flash_buf_ptr != out_end) {
+        *flash_buf_ptr++ = *in_start++;
+    }
+}
+
 void sd_evt_handler(uint32_t evt_id) {
     switch (evt_id) {
         case NRF_EVT_FLASH_OPERATION_SUCCESS:
-            LOG("sd evt: flash operation finished");
+            //LOG("sd evt: flash operation finished");
             ble_send_reply(0);
             break;
         case NRF_EVT_FLASH_OPERATION_ERROR:
