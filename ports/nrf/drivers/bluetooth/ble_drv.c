@@ -870,7 +870,9 @@ static void sd_evt_handler(uint32_t evt_id) {
             hal_nvmc_operation_finished(HAL_NVMC_ERROR);
             break;
 #endif
+
         default:
+            BLE_DRIVER_LOG(">>> unhandled SD evt\n");
             // unhandled event!
             break;
     }
@@ -1053,7 +1055,7 @@ static void ble_evt_handler(ble_evt_t * p_ble_evt) {
 #endif
 
         default:
-            BLE_DRIVER_LOG(">>> unhandled evt: 0x" HEX2_FMT "\n", p_ble_evt->header.evt_id);
+            BLE_DRIVER_LOG(">>> unhandled BLE evt: 0x" HEX2_FMT "\n", p_ble_evt->header.evt_id);
             break;
     }
 }
