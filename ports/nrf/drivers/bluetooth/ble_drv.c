@@ -271,8 +271,7 @@ bool ble_drv_service_add(ubluepy_service_obj_t * p_service_obj) {
 
         ble_uuid_t uuid;
         uuid.type  = p_service_obj->p_uuid->uuid_vs_idx;
-        uuid.uuid  = p_service_obj->p_uuid->value[0];
-        uuid.uuid += p_service_obj->p_uuid->value[1] << 8;
+        uuid.uuid  = p_service_obj->p_uuid->value;
 
         if (sd_ble_gatts_service_add(p_service_obj->type,
                                      &uuid,
@@ -285,8 +284,7 @@ bool ble_drv_service_add(ubluepy_service_obj_t * p_service_obj) {
 
         ble_uuid_t uuid;
         uuid.type  = p_service_obj->p_uuid->type;
-        uuid.uuid  = p_service_obj->p_uuid->value[0];
-        uuid.uuid += p_service_obj->p_uuid->value[1] << 8;
+        uuid.uuid  = p_service_obj->p_uuid->value;
 
         if (sd_ble_gatts_service_add(p_service_obj->type,
                                      &uuid,
@@ -335,8 +333,7 @@ bool ble_drv_characteristic_add(ubluepy_characteristic_obj_t * p_char_obj) {
     }
 
     uuid.type  = p_char_obj->p_uuid->type;
-    uuid.uuid  = p_char_obj->p_uuid->value[0];
-    uuid.uuid += p_char_obj->p_uuid->value[1] << 8;
+    uuid.uuid  = p_char_obj->p_uuid->value;
 
     memset(&attr_md, 0, sizeof(attr_md));
 
@@ -450,8 +447,7 @@ bool ble_drv_advertise_data(ubluepy_advertise_data_t * p_adv_params) {
 
                 ble_uuid_t uuid;
                 uuid.type  = p_service->p_uuid->type;
-                uuid.uuid  = p_service->p_uuid->value[0];
-                uuid.uuid += p_service->p_uuid->value[1] << 8;
+                uuid.uuid  = p_service->p_uuid->value;
                 // calculate total size of uuids
                 if (sd_ble_uuid_encode(&uuid, &encoded_size, NULL) != 0) {
                     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_OSError,
@@ -472,10 +468,9 @@ bool ble_drv_advertise_data(ubluepy_advertise_data_t * p_adv_params) {
 
                 uuid_total_size += encoded_size; // size of entry
                 byte_pos        += encoded_size; // relative to adv data packet
-                BLE_DRIVER_LOG("ADV: uuid size: %u, type: %u, uuid: %x%x, vs_idx: %u\n",
+                BLE_DRIVER_LOG("ADV: uuid size: %u, type: %u, uuid: %x, vs_idx: %u\n",
                        encoded_size, p_service->p_uuid->type,
-                       p_service->p_uuid->value[1],
-                       p_service->p_uuid->value[0],
+                       (p_service->p_uuid->value),
                        p_service->p_uuid->uuid_vs_idx);
             }
 
@@ -499,8 +494,7 @@ bool ble_drv_advertise_data(ubluepy_advertise_data_t * p_adv_params) {
 
                 ble_uuid_t uuid;
                 uuid.type  = p_service->p_uuid->uuid_vs_idx;
-                uuid.uuid  = p_service->p_uuid->value[0];
-                uuid.uuid += p_service->p_uuid->value[1] << 8;
+                uuid.uuid  = p_service->p_uuid->value;
 
                 // calculate total size of uuids
                 if (sd_ble_uuid_encode(&uuid, &encoded_size, NULL) != 0) {
@@ -522,10 +516,9 @@ bool ble_drv_advertise_data(ubluepy_advertise_data_t * p_adv_params) {
 
                 uuid_total_size += encoded_size; // size of entry
                 byte_pos        += encoded_size; // relative to adv data packet
-                BLE_DRIVER_LOG("ADV: uuid size: %u, type: %x%x, uuid: %u, vs_idx: %u\n",
+                BLE_DRIVER_LOG("ADV: uuid size: %u, type: %x, uuid: %u, vs_idx: %u\n",
                        encoded_size, p_service->p_uuid->type,
-                       p_service->p_uuid->value[1],
-                       p_service->p_uuid->value[0],
+                       p_service->p_uuid->value,
                        p_service->p_uuid->uuid_vs_idx);
             }
 

@@ -37,8 +37,8 @@
 STATIC void ubluepy_descriptor_print(const mp_print_t *print, mp_obj_t o, mp_print_kind_t kind) {
     ubluepy_descriptor_obj_t * self = (ubluepy_descriptor_obj_t *)o;
 
-    mp_printf(print, "Descriptor(uuid: 0x" HEX2_FMT HEX2_FMT ")",
-              self->p_uuid->value[1], self->p_uuid->value[0]);
+    mp_printf(print, "Descriptor(uuid: 0x" HEX2_FMT ")",
+              self->p_uuid->value);
 }
 
 STATIC mp_obj_t ubluepy_descriptor_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {

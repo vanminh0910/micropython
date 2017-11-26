@@ -40,19 +40,19 @@
 static ubluepy_uuid_obj_t uuid_obj_service = {
     .base.type = &ubluepy_uuid_type,
     .type = UBLUEPY_UUID_128_BIT,
-    .value = {0x01, 0x00}
+    .value = 0x0001,
 };
 
 static ubluepy_uuid_obj_t uuid_obj_char_tx = {
     .base.type = &ubluepy_uuid_type,
     .type = UBLUEPY_UUID_128_BIT,
-    .value = {0x03, 0x00}
+    .value = 0x0002,
 };
 
 static ubluepy_uuid_obj_t uuid_obj_char_rx = {
     .base.type = &ubluepy_uuid_type,
     .type = UBLUEPY_UUID_128_BIT,
-    .value = {0x02, 0x00}
+    .value = 0x0003,
 };
 
 static ubluepy_service_obj_t ble_uart_service = {

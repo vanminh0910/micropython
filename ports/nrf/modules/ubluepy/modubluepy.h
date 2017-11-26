@@ -109,8 +109,8 @@ typedef enum {
 typedef struct _ubluepy_uuid_obj_t {
     mp_obj_base_t       base;
     ubluepy_uuid_type_t type;
-    uint8_t             value[2];
     uint8_t             uuid_vs_idx;
+    uint16_t            value;
 } ubluepy_uuid_obj_t;
 
 typedef struct _ubluepy_peripheral_obj_t {

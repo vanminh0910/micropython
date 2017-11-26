@@ -139,8 +139,8 @@ STATIC mp_obj_t service_get_characteristic(mp_obj_t self_in, mp_obj_t uuid) {
         ubluepy_characteristic_obj_t * p_char = (ubluepy_characteristic_obj_t *)chars[i];
 
         bool type_match = p_char->p_uuid->type == p_uuid->type;
-        bool uuid_match = ((uint16_t)(*(uint16_t *)&p_char->p_uuid->value[0]) ==
-                           (uint16_t)(*(uint16_t *)&p_uuid->value[0]));
+        bool uuid_match = ((uint16_t)(*(uint16_t *)&p_char->p_uuid->value) ==
+                           (uint16_t)(*(uint16_t *)&p_uuid->value));
 
         if (type_match && uuid_match) {
             return MP_OBJ_FROM_PTR(p_char);
