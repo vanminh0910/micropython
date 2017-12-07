@@ -38,6 +38,8 @@ R_XTENSA_PLT        = 6
 R_XTENSA_ASM_EXPAND = 11
 R_XTENSA_SLOT0_OP   = 20
 
+R_ARM_ABS32         = 2 # (S + A) | T
+
 def to_uint(n):
     if n < 0:
         raise ValueError('unsigned integer cannot be < 0: %r' % n)
@@ -124,16 +126,24 @@ class Section:
         return strings
 
     def read_relocations(self, f, header):
-        if self.sh_type != SHT_RELA:
+        if self.sh_type not in [SHT_RELA, SHT_REL]:
             raise ValueError('not a .rela section')
         f.seek(self.sh_offset)
         relocations = []
-        if header.is_64bit:
-            for i in range(self.sh_size // 24):
-                relocations.append(Relocation(struct.unpack('QQq', f.read(24)), header))
+        if self.sh_type == SHT_RELA:
+            if header.is_64bit:
+                for i in range(self.sh_size // 24):
+                    relocations.append(Relocation(struct.unpack('QQq', f.read(24)), header))
+            else:
+                for i in range(self.sh_size // 12):
+                    relocations.append(Relocation(struct.unpack('IIi', f.read(12)), header))
         else:
-            for i in range(self.sh_size // 12):
-                relocations.append(Relocation(struct.unpack('IIi', f.read(12)), header))
+            if header.is_64bit:
+                for i in range(self.sh_size // 16):
+                    relocations.append(Relocation(struct.unpack('QQ', f.read(16)), header))
+            else:
+                for i in range(self.sh_size // 8):
+                    relocations.append(Relocation(struct.unpack('II', f.read(8)), header))
         return relocations
 
     def read(self, f):
@@ -194,7 +204,6 @@ def create_mpy(elfpath, mpypath):
     section_all = bytearray(sections['.all'].read(f))
     header_len = 16
 
-    relocations = None
 
     if header.e_machine == ISA_XTENSA:
         relocations = []
@@ -221,6 +230,28 @@ def create_mpy(elfpath, mpypath):
                 continue
             else:
                 print('WARNING: unknown relocation type %d' % r.r_type)
+    elif header.e_machine == ISA_ARM:
+        relocations = []
+        # Documentation:
+        # http://infocenter.arm.com/help/topic/com.arm.doc.ihi0044f/IHI0044F_aaelf.pdf
+        for r in sections['.rel.all'].read_relocations(f, header):
+            if r.r_type == R_ARM_ABS32:
+                if r.r_offset % 4 != 0:
+                    raise ValueError('relocation offset isn\'t aligned')
+                # addend appears to be off, so we have to use what's already
+                # stored
+                value = struct.unpack('I', section_all[r.r_offset:r.r_offset+4])[0]
+                value -= header_len
+                # insert relative relocation
+                section_all[r.r_offset:r.r_offset+4] = struct.pack('I', value)
+                if r.r_offset >= header_len:
+                    relocations.append((r.r_offset - header_len) // 4)
+                else:
+                    pass # init() pointer
+            else:
+                print('WARNING: unknown relocation type %d' % r.r_type)
+    else:
+        relocations = None
 
     mpyheader, num_qstrs, init_address = struct.unpack('6sHQ', section_all[:header_len])
     data = section_all[header_len:]

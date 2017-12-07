@@ -2,7 +2,7 @@ include ../../py/mkenv.mk
 
 INC = -I. -I../..
 
-CFLAGS = $(INC) -Wall -Werror -ansi -std=gnu99 -fPIC -fno-stack-protector -Os
+CFLAGS = $(INC) -Wall -Werror -ansi -std=gnu99 -fno-stack-protector -Os
 
 ARCH = native
 

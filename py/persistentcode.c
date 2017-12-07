@@ -239,7 +239,6 @@ mp_raw_code_t *load_raw_code_native(mp_reader_t *reader) {
     uintptr_t data_address = (uintptr_t)data;
     #endif
 
-    #if defined(__xtensa__)
     // apply relocations
     size_t num_relocs = read_uint(reader);
     for (size_t i = 0; i < num_relocs; i++) {
@@ -247,9 +246,9 @@ mp_raw_code_t *load_raw_code_native(mp_reader_t *reader) {
         ((uint32_t*)data)[reloc] += data_address;
     }
 
+    #if defined(__xtensa__)
     const size_t start_offset = read_uint(reader);
     #else
-    (void)data_address; // dummy, keep the compiler happy
     const size_t start_offset = 0; // default
     #endif
 
