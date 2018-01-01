@@ -27,7 +27,7 @@
 #ifndef I2C_H__
 #define I2C_H__
 
-#include "hal_twi.h"
+#include "nrf_twi.h"
 
 extern const mp_obj_type_t machine_i2c_type;
 

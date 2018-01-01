@@ -28,6 +28,9 @@
 #ifndef UART_H__
 #define UART_H__
 
+#include "pin.h"
+#include "genhdr/pins.h"
+
 typedef enum {
     PYB_UART_NONE = 0,
     PYB_UART_1 = 1,

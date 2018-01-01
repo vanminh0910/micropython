@@ -39,7 +39,7 @@
 
 #if NRF52
 // Use PWM hardware.
-#include "hal_pwm.h"
+#include "nrf_pwm.h"
 #endif
 
 #ifdef MICROPY_HW_PWM0_NAME

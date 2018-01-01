@@ -35,7 +35,7 @@
 #include "pin.h"
 #include "genhdr/pins.h"
 #include "spi.h"
-#include "hal_spi.h"
+#include "nrf_spi.h"
 
 #if MICROPY_PY_MACHINE_HW_SPI
 

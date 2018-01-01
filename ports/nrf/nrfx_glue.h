@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2017 Glenn Ruben Bakke
+ * Copyright (c) 2018 Glenn Ruben Bakke
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,14 +24,12 @@
  * THE SOFTWARE.
  */
 
-#ifndef ADC_H__
-#define ADC_H__
+#ifndef NRFX_GLUE_H
+#define NRFX_GLUE_H
 
-#if NRF51
-#include "nrf_adc.h"
-#else
-#include "nrf_saadc.h"
-#endif
-extern const mp_obj_type_t machine_adc_type;
+#define NRFX_ASSERT(expression)
+#define NRFX_IRQ_ENABLE(irq_number)
+#define NRFX_IRQ_DISABLE(irq_number)
+#define NRFX_IRQ_PRIORITY_SET(irq_number, priority)
 
-#endif // ADC_H__
+#endif // NRFX_GLUE_H

@@ -24,11 +24,11 @@
  * THE SOFTWARE.
  */
 
-#include "hal_pwm.h"
+#include "nrf_pwm.h"
 
 typedef struct _pyb_pwm_obj_t {
     mp_obj_base_t base;
-    PWM_HandleTypeDef *pwm;
+    NRF_PWM_Type *pwm;
 } pyb_pwm_obj_t;
 
 typedef struct _machine_hard_pwm_obj_t {

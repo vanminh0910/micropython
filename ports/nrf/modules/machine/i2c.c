@@ -32,7 +32,7 @@
 #include "py/mphal.h"
 #include "extmod/machine_i2c.h"
 #include "i2c.h"
-#include "hal_twi.h"
+#include "nrf_twi.h"
 
 #if MICROPY_PY_MACHINE_I2C
 

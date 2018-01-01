@@ -49,10 +49,6 @@ INC += -I.
 INC += -I../..
 INC += -I$(BUILD)
 INC += -I./../../lib/cmsis/inc
-INC += -I./device
-INC += -I./device/$(MCU_VARIANT)
-INC += -I./hal
-INC += -I./hal/$(MCU_VARIANT)
 INC += -I./modules/machine
 INC += -I./modules/ubluepy
 INC += -I./modules/music
@@ -61,6 +57,11 @@ INC += -I./modules/ble
 INC += -I../../lib/mp-readline
 INC += -I./drivers/bluetooth
 INC += -I./drivers
+INC += -I../../lib/nrfx/
+INC += -I../../lib/nrfx/drivers/include
+INC += -I../../lib/nrfx/mdk
+INC += -I../../lib/nrfx/hal
+
 
 NRF_DEFINES += -D$(MCU_VARIANT_UPPER)
 NRF_DEFINES += -DCONFIG_GPIO_AS_PINRESET
@@ -135,28 +136,9 @@ SRC_LIB += $(addprefix lib/,\
 	oofatfs/option/unicode.c \
 	)
 
-SRC_HAL = $(addprefix hal/,\
-	hal_uart.c \
-	hal_uarte.c \
-	hal_spi.c \
-	hal_spie.c \
-	hal_time.c \
-	hal_rtc.c \
-	hal_timer.c \
-	hal_twi.c \
-	hal_adc.c \
-	hal_adce.c \
-	hal_temp.c \
-	hal_gpio.c \
-	hal_rng.c \
-	hal_nvmc.c \
+SRC_NRFX += $(addprefix lib/nrfx/drivers/src/,\
+	nrfx_uart.c \
 	)
-
-ifeq ($(MCU_VARIANT), nrf52)
-SRC_HAL += $(addprefix hal/,\
-	hal_pwm.c \
-	)
-endif
 
 SRC_C += \
 	main.c \
@@ -211,7 +193,7 @@ FROZEN_MPY_MPY_FILES := $(addprefix $(BUILD)/,$(FROZEN_MPY_PY_FILES:.py=.mpy))
 
 OBJ += $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
-OBJ += $(addprefix $(BUILD)/, $(SRC_HAL:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
 OBJ += $(BUILD)/pins_gen.o
 

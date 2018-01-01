@@ -27,7 +27,7 @@
 #ifndef TIMER_H__
 #define TIMER_H__
 
-#include "hal_timer.h"
+#include "nrf_timer.h"
 
 extern const mp_obj_type_t machine_timer_type;
 

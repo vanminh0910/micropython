@@ -29,7 +29,7 @@
 #include <string.h>
 
 #include "py/runtime.h"
-#include "hal_rng.h"
+#include "nrf_rng.h"
 
 #if MICROPY_PY_HW_RNG
 

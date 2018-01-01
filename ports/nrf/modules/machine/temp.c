@@ -31,7 +31,7 @@
 #include "py/runtime.h"
 #include "py/mphal.h"
 #include "temp.h"
-#include "hal_temp.h"
+#include "nrf_temp.h"
 
 #if MICROPY_PY_MACHINE_TEMP
 

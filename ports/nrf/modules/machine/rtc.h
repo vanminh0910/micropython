@@ -27,7 +27,7 @@
 #ifndef RTC_H__
 #define RTC_H__
 
-#include "hal_rtc.h"
+#include "nrf_rtc.h"
 
 extern const mp_obj_type_t machine_rtc_type;
 

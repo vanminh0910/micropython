@@ -31,7 +31,7 @@
 #include "py/runtime.h"
 #include "py/mphal.h"
 #include "rtc.h"
-#include "hal_rtc.h"
+#include "nrf_rtc.h"
 
 #if MICROPY_PY_MACHINE_RTC
 

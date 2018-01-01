@@ -24,6 +24,8 @@
  * THE SOFTWARE.
  */
 
+#if MICROPY_PY_MACHINE_ADC
+
 #include <stdio.h>
 #include <string.h>
 
@@ -31,9 +33,7 @@
 #include "py/runtime.h"
 #include "py/mphal.h"
 #include "adc.h"
-#include "hal_adc.h"
-
-#if MICROPY_PY_MACHINE_ADC
+#include "nrf_adc.h"
 
 typedef struct _machine_adc_obj_t {
     mp_obj_base_t base;

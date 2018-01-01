@@ -77,3 +77,87 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, mp_uint_t len) {
 void mp_hal_stdout_tx_str(const char *str) {
     mp_hal_stdout_tx_strn(str, strlen(str));
 }
+
+void mp_hal_delay_us(mp_uint_t us)
+{
+    register uint32_t delay __ASM ("r0") = us;
+    __ASM volatile (
+#ifdef NRF51
+            ".syntax unified\n"
+#endif
+        "1:\n"
+        " SUBS %0, %0, #1\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+#ifdef NRF52
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+        " NOP\n"
+#endif
+        " BNE 1b\n"
+#ifdef NRF51
+        ".syntax divided\n"
+#endif
+        : "+r" (delay));
+}
+
+void mp_hal_delay_ms(mp_uint_t ms)
+{
+    for (mp_uint_t i = 0; i < ms; i++)
+    {
+        mp_hal_delay_us(999);
+    }
+}

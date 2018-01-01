@@ -41,33 +41,36 @@
 #include "mpconfigboard.h"
 #include "nrf.h"
 #include "mphalport.h"
-#include "hal_uart.h"
+#include "nrfx_uart.h"
+
 
 typedef struct _machine_hard_uart_obj_t {
-    mp_obj_base_t base;
-    UART_HandleTypeDef * uart;
-    byte char_width;                    // 0 for 7,8 bit chars, 1 for 9 bit chars
+    mp_obj_base_t      base;
+    uint8_t            id;          // UART instance id
+    nrfx_uart_t *      p_uart;      // Driver instance
+    nrfx_uart_config_t config;      // UART configuration
+    byte               char_width;  // 0 for 7,8 bit chars, 1 for 9 bit chars
 } machine_hard_uart_obj_t;
 
-UART_HandleTypeDef UARTHandle0 = {.p_instance = NULL, .init.id = 0};
+static nrfx_uart_t instance0 = NRFX_UART_INSTANCE(0);
 #if NRF52840_XXAA
-UART_HandleTypeDef UARTHandle1 = {.p_instance = NULL, .init.id = 1};
+static nrfx_uart_t instance1 = NRFX_UART_INSTANCE(1);
 #endif
 
 STATIC machine_hard_uart_obj_t machine_hard_uart_obj[] = {
-    {{&machine_hard_uart_type}, &UARTHandle0},
+    {{&machine_hard_uart_type}, .p_uart = &instance0},
 #if NRF52840_XXAA
-    {{&machine_hard_uart_type}, &UARTHandle1},
+    {{&machine_hard_uart_type}, .p_uart = &instance1},
 #endif
 };
 
 void uart_init0(void) {
     // reset the UART handles
-    memset(&UARTHandle0, 0, sizeof(UART_HandleTypeDef));
-    UARTHandle0.p_instance = UART_BASE(0);
+    memset(&machine_hard_uart_obj[0].config, 0, sizeof(nrfx_uart_config_t));
+    machine_hard_uart_obj[0].id = 0;
 #if NRF52840_XXAA
-    memset(&UARTHandle1, 0, sizeof(UART_HandleTypeDef));
-    UARTHandle0.p_instance = UART_BASE(1);
+    memset(&machine_hard_uart_obj[1].config, 0, sizeof(nrfx_uart_config_t));
+    machine_hard_uart_obj[1].id = 1;
 #endif
 }
 
@@ -75,7 +78,7 @@ STATIC int uart_find(mp_obj_t id) {
     // given an integer id
     int uart_id = mp_obj_get_int(id);
     if (uart_id >= 0 && uart_id <= MP_ARRAY_SIZE(machine_hard_uart_obj)
-        && machine_hard_uart_obj[uart_id].uart != NULL) {
+        && machine_hard_uart_obj[uart_id].p_uart != NULL) {
         return uart_id;
     }
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
@@ -93,12 +96,12 @@ bool uart_rx_any(machine_hard_uart_obj_t *uart_obj) {
 
 int uart_rx_char(machine_hard_uart_obj_t * self) {
     uint8_t ch;
-    hal_uart_char_read(self->uart->p_instance, &ch);
+    nrfx_uart_rx(self->p_uart, &ch, 1);
     return (int)ch;
 }
 
-STATIC hal_uart_error_t uart_tx_char(machine_hard_uart_obj_t * self, int c) {
-    return hal_uart_char_write(self->uart->p_instance, (char)c);
+STATIC nrfx_err_t uart_tx_char(machine_hard_uart_obj_t * self, int c) {
+    return nrfx_uart_tx(self->p_uart, (uint8_t *)&c, 1);
 }
 
 
@@ -157,84 +160,88 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
     int uart_id = uart_find(args[0].u_obj);
     machine_hard_uart_obj_t * self = &machine_hard_uart_obj[uart_id];
 
-    hal_uart_init_t * init = &self->uart->init;
+    nrfx_uart_config_t * config = &self->config;
 
     // flow control
-    init->flow_control = args[5].u_int;
+    config->hwfc = args[5].u_int;
 
 #if MICROPY_HW_UART1_HWFC
-    init->flow_control = true;
+    config->hwfc = NRF_UART_HWFC_ENABLED;
 #else
-	init->flow_control = false;
+    config->hwfc = NRF_UART_HWFC_DISABLED;
 #endif
-	init->use_parity   = false;
+
+    config->hwfc = NRF_UART_PARITY_EXCLUDED;
+
 #if (BLUETOOTH_SD == 100)
-	init->irq_priority = 3;
+    config->interrupt_priority = 3;
 #else
-	init->irq_priority = 6;
+    config->interrupt_priority = 6;
 #endif
 
     switch (args[1].u_int) {
         case 1200:
-            init->baud_rate = HAL_UART_BAUD_1K2;
+            config->baudrate = NRF_UART_BAUDRATE_1200;
             break;
         case 2400:
-            init->baud_rate = HAL_UART_BAUD_2K4;
+            config->baudrate = NRF_UART_BAUDRATE_2400;
             break;
         case 4800:
-            init->baud_rate = HAL_UART_BAUD_4K8;
+            config->baudrate = NRF_UART_BAUDRATE_4800;
             break;
         case 9600:
-            init->baud_rate = HAL_UART_BAUD_9K6;
+            config->baudrate = NRF_UART_BAUDRATE_9600;
             break;
         case 14400:
-            init->baud_rate = HAL_UART_BAUD_14K4;
+            config->baudrate = NRF_UART_BAUDRATE_14400;
             break;
         case 19200:
-            init->baud_rate = HAL_UART_BAUD_19K2;
+            config->baudrate = NRF_UART_BAUDRATE_19200;
             break;
         case 28800:
-            init->baud_rate = HAL_UART_BAUD_28K8;
+            config->baudrate = NRF_UART_BAUDRATE_28800;
             break;
         case 38400:
-            init->baud_rate = HAL_UART_BAUD_38K4;
+            config->baudrate = NRF_UART_BAUDRATE_38400;
             break;
         case 57600:
-            init->baud_rate = HAL_UART_BAUD_57K6;
+            config->baudrate = NRF_UART_BAUDRATE_57600;
             break;
         case 76800:
-            init->baud_rate = HAL_UART_BAUD_76K8;
+            config->baudrate = NRF_UART_BAUDRATE_76800;
             break;
         case 115200:
-            init->baud_rate = HAL_UART_BAUD_115K2;
+            config->baudrate = NRF_UART_BAUDRATE_115200;
             break;
         case 230400:
-            init->baud_rate = HAL_UART_BAUD_230K4;
+            config->baudrate = NRF_UART_BAUDRATE_230400;
             break;
         case 250000:
-            init->baud_rate = HAL_UART_BAUD_250K0;
-            break;
-        case 500000:
-            init->baud_rate = HAL_UART_BAUD_500K0;
+            config->baudrate = NRF_UART_BAUDRATE_250000;
             break;
         case 1000000:
-            init->baud_rate = HAL_UART_BAUD_1M0;
+            config->baudrate = NRF_UART_BAUDRATE_1000000;
             break;
         default:
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-                      "UART baudrate not supported, %ul", init->baud_rate));
+                      "UART baudrate not supported, %ul", config->baudrate));
             break;
     }
 
-    init->rx_pin = &MICROPY_HW_UART1_RX;
-    init->tx_pin = &MICROPY_HW_UART1_TX;
+    config->pseltxd = (&MICROPY_HW_UART1_TX)->pin;
+    config->pselrxd = (&MICROPY_HW_UART1_RX)->pin;
 
 #if MICROPY_HW_UART1_HWFC
-    init->rts_pin = &MICROPY_HW_UART1_RTS;
-    init->cts_pin = &MICROPY_HW_UART1_CTS;
+    config->pselrts = (&MICROPY_HW_UART1_RTS)->pin;
+    config->pselcts = (&MICROPY_HW_UART1_CTS)->pin;
 #endif
 
-    hal_uart_init(self->uart->p_instance, init);
+    // Set context to this instance of UART
+    config->p_context = (void *)self;
+
+    // Set NULL as callback function to keep it blocking
+    nrfx_uart_init(self->p_uart, config, NULL);
+
 
     return MP_OBJ_FROM_PTR(self);
 }
@@ -248,15 +255,13 @@ STATIC mp_obj_t machine_hard_uart_writechar(mp_obj_t self_in, mp_obj_t char_in) 
     // get the character to write (might be 9 bits)
     uint16_t data = mp_obj_get_int(char_in);
 
-    hal_uart_error_t err = 0;
+    nrfx_err_t err = NRFX_SUCCESS;
     for (int i = 0; i < 2; i++) {
         err = uart_tx_char(self, (int)(&data)[i]);
     }
 
-    HAL_StatusTypeDef status = self->uart->p_instance->EVENTS_ERROR;
-
-    if (err != HAL_UART_ERROR_NONE) {
-        mp_hal_raise(status);
+    if (err != NRFX_SUCCESS) {
+        mp_hal_raise(err);
     }
 
     return mp_const_none;
@@ -342,12 +347,12 @@ STATIC mp_uint_t machine_hard_uart_write(mp_obj_t self_in, const void *buf_in, m
         return MP_STREAM_ERROR;
     }
 
-    hal_uart_error_t err = 0;
+    nrfx_err_t err = NRFX_SUCCESS;
     for (int i = 0; i < size; i++) {
         err = uart_tx_char(self, (int)((uint8_t *)buf)[i]);
     }
 
-    if (err == HAL_UART_ERROR_NONE) {
+    if (err == NRFX_SUCCESS) {
         // return number of bytes written
         return size;
     } else {
