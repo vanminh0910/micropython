@@ -101,6 +101,10 @@ int uart_rx_char(machine_hard_uart_obj_t * self) {
 }
 
 STATIC nrfx_err_t uart_tx_char(machine_hard_uart_obj_t * self, int c) {
+    while (nrfx_uart_tx_in_progress(self->p_uart)) {
+        ;
+    }
+
     return nrfx_uart_tx(self->p_uart, (uint8_t *)&c, 1);
 }
 
@@ -171,7 +175,7 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
     config->hwfc = NRF_UART_HWFC_DISABLED;
 #endif
 
-    config->hwfc = NRF_UART_PARITY_EXCLUDED;
+    config->parity = NRF_UART_PARITY_EXCLUDED;
 
 #if (BLUETOOTH_SD == 100)
     config->interrupt_priority = 3;
