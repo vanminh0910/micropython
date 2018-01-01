@@ -32,38 +32,41 @@
 #include "py/mphal.h"
 #include "extmod/machine_i2c.h"
 #include "i2c.h"
-#include "nrf_twi.h"
+#include "nrfx_twi.h"
 
 #if MICROPY_PY_MACHINE_I2C
 
 STATIC const mp_obj_type_t machine_hard_i2c_type;
 
 typedef struct _machine_hard_i2c_obj_t {
-    mp_obj_base_t base;
-    TWI_HandleTypeDef *i2c;
+    mp_obj_base_t     base;
+    uint8_t           id;     // TWI instance id
+    nrfx_twi_t *      p_twi;  // Driver instance
+    nrfx_twi_config_t config; // TWI config
 } machine_hard_i2c_obj_t;
 
-TWI_HandleTypeDef I2CHandle0 = {.instance = NULL, .init.id = 0};
-TWI_HandleTypeDef I2CHandle1 = {.instance = NULL, .init.id = 1};
+static nrfx_twi_t instance0 = NRFX_TWI_INSTANCE(0);
+static nrfx_twi_t instance1 = NRFX_TWI_INSTANCE(1);
 
-STATIC const machine_hard_i2c_obj_t machine_hard_i2c_obj[] = {
-    {{&machine_hard_i2c_type}, &I2CHandle0},
-    {{&machine_hard_i2c_type}, &I2CHandle1},
+STATIC machine_hard_i2c_obj_t machine_hard_i2c_obj[] = {
+    {{&machine_hard_i2c_type}, .p_twi = &instance0},
+    {{&machine_hard_i2c_type}, .p_twi = &instance1}
 };
 
 void i2c_init0(void) {
     // reset the I2C handles
-    memset(&I2CHandle0, 0, sizeof(TWI_HandleTypeDef));
-    I2CHandle0.instance = TWI_BASE(0);
-    memset(&I2CHandle1, 0, sizeof(TWI_HandleTypeDef));
-    I2CHandle0.instance = TWI_BASE(1);
+    memset(&machine_hard_i2c_obj[0].config, 0, sizeof(nrfx_twi_config_t));
+    machine_hard_i2c_obj[0].id = 0;
+
+    memset(&machine_hard_i2c_obj[1].config, 0, sizeof(nrfx_twi_config_t));
+    machine_hard_i2c_obj[1].id = 1;
 }
 
 STATIC int i2c_find(mp_obj_t id) {
     // given an integer id
     int i2c_id = mp_obj_get_int(id);
     if (i2c_id >= 0 && i2c_id <= MP_ARRAY_SIZE(machine_hard_i2c_obj)
-        && machine_hard_i2c_obj[i2c_id].i2c != NULL) {
+        && machine_hard_i2c_obj[i2c_id].p_twi != NULL) {
         return i2c_id;
     }
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
@@ -72,12 +75,12 @@ STATIC int i2c_find(mp_obj_t id) {
 
 STATIC void machine_hard_i2c_print(const mp_print_t *print, mp_obj_t o, mp_print_kind_t kind) {
     machine_hard_i2c_obj_t *self = o;
-    mp_printf(print, "I2C(%u, scl=(port=%u, pin=%u), sda=(port=%u, pin=%u))",
-              self->i2c->init.id,
-              self->i2c->init.scl_pin->port,
-              self->i2c->init.scl_pin->pin,
-              self->i2c->init.sda_pin->port,
-              self->i2c->init.sda_pin->pin);
+    mp_printf(print, "I2C(%u, scl_pin=%u, sda_pin=%u, frequency=%lu, irq_prio=%u)",
+              self->id,
+              self->config.scl,
+              self->config.sda,
+              self->config.frequency,
+              self->config.interrupt_priority);
 }
 
 /******************************************************************************/
@@ -105,35 +108,40 @@ mp_obj_t machine_hard_i2c_make_new(const mp_obj_type_t *type, size_t n_args, siz
 
     // get static peripheral object
     int i2c_id = i2c_find(args[ARG_NEW_id].u_obj);
-    const machine_hard_i2c_obj_t *self = &machine_hard_i2c_obj[i2c_id];
+    machine_hard_i2c_obj_t *self = &machine_hard_i2c_obj[i2c_id];
 
     if (args[ARG_NEW_scl].u_obj != MP_OBJ_NULL) {
-        self->i2c->init.scl_pin = args[ARG_NEW_scl].u_obj;
+        const pin_obj_t * p_scl_obj = args[ARG_NEW_scl].u_obj;
+        self->config.scl = p_scl_obj->pin;
     } else {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
                   "I2C SCL Pin not set"));
     }
 
     if (args[ARG_NEW_sda].u_obj != MP_OBJ_NULL) {
-        self->i2c->init.sda_pin = args[ARG_NEW_sda].u_obj;
+        const pin_obj_t * p_sda_obj = args[ARG_NEW_sda].u_obj;
+        self->config.sda = p_sda_obj->pin;
     } else {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
                   "I2C SDA Pin not set"));
     }
 
-    self->i2c->init.freq = HAL_TWI_FREQ_100_Kbps;
+    self->config.frequency = NRF_TWI_FREQ_100K;
 
-    hal_twi_master_init(self->i2c->instance, &self->i2c->init);
+    // Set context to this object.
+    nrfx_twi_init(self->p_twi, &self->config, NULL, (void *)self);
 
     return MP_OBJ_FROM_PTR(self);
 }
 
-#include <stdio.h>
-
 int machine_hard_i2c_readfrom(mp_obj_base_t *self_in, uint16_t addr, uint8_t *dest, size_t len, bool stop) {
     machine_hard_i2c_obj_t *self = (machine_hard_i2c_obj_t *)self_in;
 
-    hal_twi_master_rx(self->i2c->instance, addr, len, dest, stop);
+    nrfx_err_t err_code = nrfx_twi_rx(self->p_twi, addr, dest, len);
+
+    if (err_code != NRFX_SUCCESS) {
+        return -err_code;
+    }
 
     return 0;
 }
@@ -141,7 +149,11 @@ int machine_hard_i2c_readfrom(mp_obj_base_t *self_in, uint16_t addr, uint8_t *de
 int machine_hard_i2c_writeto(mp_obj_base_t *self_in, uint16_t addr, const uint8_t *src, size_t len, bool stop) {
     machine_hard_i2c_obj_t *self = (machine_hard_i2c_obj_t *)self_in;
 
-    hal_twi_master_tx(self->i2c->instance, addr, len, src, stop);
+    nrfx_err_t err_code = nrfx_twi_tx(self->p_twi, addr, src, len, !stop);
+
+    if (err_code != NRFX_SUCCESS) {
+         return -err_code;
+    }
 
     return 0;
 }
