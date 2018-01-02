@@ -35,7 +35,7 @@
 #include "pin.h"
 #include "genhdr/pins.h"
 #include "spi.h"
-#include "nrf_spi.h"
+#include "nrfx_spi.h"
 
 #if MICROPY_PY_MACHINE_HW_SPI
 
@@ -63,22 +63,29 @@
 ///     spi.send_recv(b'1234', buf)          # send 4 bytes and receive 4 into buf
 ///     spi.send_recv(buf, buf)              # send/recv 4 bytes from/to buf
 
-SPI_HandleTypeDef SPIHandle0 = {.instance = NULL};
-SPI_HandleTypeDef SPIHandle1 = {.instance = NULL};
+typedef struct _machine_hard_spi_obj_t {
+    mp_obj_base_t     base;
+    uint8_t           id;     // SPI instance id
+    nrfx_spi_t *      p_spi;  // Driver instance
+    nrfx_spi_config_t config; // SPI configuration
+} machine_hard_spi_obj_t;
+
+static nrfx_spi_t instance0 = NRFX_SPI_INSTANCE(0);
+static nrfx_spi_t instance1 = NRFX_SPI_INSTANCE(1);
 #if NRF52
-SPI_HandleTypeDef SPIHandle2 = {.instance = NULL};
+static nrfx_spi_t instance2 = NRFX_SPI_INSTANCE(2);
 #if NRF52840_XXAA
-SPI_HandleTypeDef SPIHandle3 = {.instance = NULL}; // 32 Mbs master only
+static nrfx_spi_t instance3 = NRFX_SPI_INSTANCE(3); // 32 Mbs master only
 #endif // NRF52840_XXAA
 #endif // NRF52
 
-STATIC const machine_hard_spi_obj_t machine_hard_spi_obj[] = {
-    {{&machine_hard_spi_type}, &SPIHandle0},
-    {{&machine_hard_spi_type}, &SPIHandle1},
+STATIC machine_hard_spi_obj_t machine_hard_spi_obj[] = {
+    {{&machine_hard_spi_type}, .p_spi = &instance0},
+    {{&machine_hard_spi_type}, .p_spi = &instance1},
 #if NRF52
-    {{&machine_hard_spi_type}, &SPIHandle2},
+    {{&machine_hard_spi_type}, .p_spi = &instance2},
 #if NRF52840_XXAA
-    {{&machine_hard_spi_type}, &SPIHandle3},
+    {{&machine_hard_spi_type}, .p_spi = &instance3},
 #endif // NRF52840_XXAA
 #endif // NRF52
 
@@ -86,16 +93,16 @@ STATIC const machine_hard_spi_obj_t machine_hard_spi_obj[] = {
 
 void spi_init0(void) {
     // reset the SPI handles
-    memset(&SPIHandle0, 0, sizeof(SPI_HandleTypeDef));
-    SPIHandle0.instance = SPI_BASE(0);
-    memset(&SPIHandle1, 0, sizeof(SPI_HandleTypeDef));
-    SPIHandle1.instance = SPI_BASE(1);
+    memset(&machine_hard_spi_obj[0].config, 0, sizeof(nrfx_spi_config_t));
+    machine_hard_spi_obj[0].id = 0;
+    memset(&machine_hard_spi_obj[1].config, 0, sizeof(nrfx_spi_config_t));
+    machine_hard_spi_obj[1].id = 1;
 #if NRF52
-    memset(&SPIHandle2, 0, sizeof(SPI_HandleTypeDef));
-    SPIHandle2.instance = SPI_BASE(2);
+    memset(&machine_hard_spi_obj[2].config, 0, sizeof(nrfx_spi_config_t));
+    machine_hard_spi_obj[2].id = 2;
 #if NRF52840_XXAA
-    memset(&SPIHandle3, 0, sizeof(SPI_HandleTypeDef));
-    SPIHandle3.instance = SPI_BASE(3);
+    memset(&machine_hard_spi_obj[3].config, 0, sizeof(nrfx_spi_config_t));
+    machine_hard_spi_obj[3].id = 3;
 #endif // NRF52840_XXAA
 #endif // NRF52
 }
@@ -116,7 +123,7 @@ STATIC int spi_find(mp_obj_t id) {
         // given an integer id
         int spi_id = mp_obj_get_int(id);
         if (spi_id >= 0 && spi_id <= MP_ARRAY_SIZE(machine_hard_spi_obj)
-            && machine_hard_spi_obj[spi_id].spi != NULL) {
+            && machine_hard_spi_obj[spi_id].p_spi != NULL) {
             return spi_id;
         }
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
@@ -124,19 +131,15 @@ STATIC int spi_find(mp_obj_t id) {
     }
 }
 
-void spi_init(SPI_HandleTypeDef *spi, bool enable_nss_pin) {
-}
-
-void spi_deinit(SPI_HandleTypeDef *spi) {
-}
-
 STATIC void spi_transfer(const machine_hard_spi_obj_t * self, size_t len, const void * src, void * dest) {
-    hal_spi_master_tx_rx(self->spi->instance, len, src, dest);
-}
+    nrfx_spi_xfer_desc_t xfer_desc = {
+        .p_tx_buffer = src,
+	.tx_length   = len,
+	.p_rx_buffer = dest,
+	.rx_length   = len
+    };
 
-STATIC void spi_print(const mp_print_t *print, SPI_HandleTypeDef *spi, bool legacy) {
-    uint spi_num = 0; // default to SPI1
-    mp_printf(print, "SPI(%u)", spi_num);
+    nrfx_spi_xfer(self->p_spi, &xfer_desc, 0);
 }
 
 /******************************************************************************/
@@ -238,8 +241,8 @@ STATIC const mp_rom_map_elem_t machine_spi_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_write), MP_ROM_PTR(&mp_machine_spi_write_obj) },
     { MP_ROM_QSTR(MP_QSTR_write_readinto), MP_ROM_PTR(&mp_machine_spi_write_readinto_obj) },
 
-    { MP_ROM_QSTR(MP_QSTR_MSB), MP_ROM_INT(HAL_SPI_MSB_FIRST) }, // SPI_FIRSTBIT_MSB
-    { MP_ROM_QSTR(MP_QSTR_LSB), MP_ROM_INT(HAL_SPI_LSB_FIRST) }, // SPI_FIRSTBIT_LSB
+    { MP_ROM_QSTR(MP_QSTR_MSB), MP_ROM_INT(NRFX_SPI_BIT_ORDER_MSB_FIRST) },
+    { MP_ROM_QSTR(MP_QSTR_LSB), MP_ROM_INT(NRFX_SPI_BIT_ORDER_LSB_FIRST) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(machine_spi_locals_dict, machine_spi_locals_dict_table);
@@ -248,71 +251,87 @@ STATIC MP_DEFINE_CONST_DICT(machine_spi_locals_dict, machine_spi_locals_dict_tab
 
 STATIC void machine_hard_spi_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     machine_hard_spi_obj_t *self = self_in;
-    spi_print(print, self->spi, false);
+    mp_printf(print, "SPI(%u, sck_pin=%u, miso_pin=%u, mosi_pin=%u, frequency=%lu, irq_prio=%u)",
+              self->id,
+              self->config.sck_pin,
+              self->config.miso_pin,
+              self->config.mosi_pin,
+              self->config.frequency,
+              self->config.irq_priority);
 }
 
 STATIC mp_obj_t machine_hard_spi_make_new(mp_arg_val_t *args) {
     // get static peripheral object
     int spi_id = spi_find(args[ARG_NEW_id].u_obj);
-    const machine_hard_spi_obj_t *self = &machine_hard_spi_obj[spi_id];
+    machine_hard_spi_obj_t *self = &machine_hard_spi_obj[spi_id];
+
+    nrfx_spi_config_t * config = &self->config;
 
     // here we would check the sck/mosi/miso pins and configure them
     if (args[ARG_NEW_sck].u_obj != MP_OBJ_NULL
         && args[ARG_NEW_mosi].u_obj != MP_OBJ_NULL
         && args[ARG_NEW_miso].u_obj != MP_OBJ_NULL) {
 
-        self->spi->init.clk_pin = args[ARG_NEW_sck].u_obj;
-        self->spi->init.mosi_pin = args[ARG_NEW_mosi].u_obj;
-        self->spi->init.miso_pin = args[ARG_NEW_miso].u_obj;
+        config->sck_pin  = ((const pin_obj_t *)args[ARG_NEW_sck].u_obj)->pin;
+        config->mosi_pin = ((const pin_obj_t *)args[ARG_NEW_mosi].u_obj)->pin;
+        config->miso_pin = ((const pin_obj_t *)args[ARG_NEW_miso].u_obj)->pin;
     } else {
-        self->spi->init.clk_pin = &MICROPY_HW_SPI0_SCK;
-        self->spi->init.mosi_pin = &MICROPY_HW_SPI0_MOSI;
-        self->spi->init.miso_pin = &MICROPY_HW_SPI0_MISO;
+        config->sck_pin  = (&MICROPY_HW_SPI0_SCK)->pin;
+        config->mosi_pin = (&MICROPY_HW_SPI0_MOSI)->pin;
+        config->miso_pin = (&MICROPY_HW_SPI0_MISO)->pin;
     }
+
+    // Manually trigger slave select from upper layer.
+    config->ss_pin = NRFX_SPI_PIN_NOT_USED;
 
     int baudrate = args[ARG_NEW_baudrate].u_int;
 
     if (baudrate <= 125000) {
-        self->spi->init.freq = HAL_SPI_FREQ_125_Kbps;
+        config->frequency = NRFX_SPI_FREQ_125K;
     } else if (baudrate <= 250000) {
-        self->spi->init.freq = HAL_SPI_FREQ_250_Kbps;
+        config->frequency = NRFX_SPI_FREQ_250K;
     } else if (baudrate <= 500000) {
-        self->spi->init.freq = HAL_SPI_FREQ_500_Kbps;
+        config->frequency = NRFX_SPI_FREQ_500K;
     } else if (baudrate <= 1000000) {
-        self->spi->init.freq = HAL_SPI_FREQ_1_Mbps;
+        config->frequency = NRFX_SPI_FREQ_1M;
     } else if (baudrate <= 2000000) {
-        self->spi->init.freq = HAL_SPI_FREQ_2_Mbps;
+        config->frequency = NRFX_SPI_FREQ_2M;
     } else if (baudrate <= 4000000) {
-        self->spi->init.freq = HAL_SPI_FREQ_4_Mbps;
+        config->frequency = NRFX_SPI_FREQ_4M;
     } else if (baudrate <= 8000000) {
-        self->spi->init.freq = HAL_SPI_FREQ_8_Mbps;
+        config->frequency = NRFX_SPI_FREQ_8M;
 #if NRF52840_XXAA
     } else if (baudrate <= 16000000) {
-        self->spi->init.freq = HAL_SPI_FREQ_16_Mbps;
+        config->frequency = SPIM_FREQUENCY_FREQUENCY_M16; // Temporary value until SPIM support is addressed (EasyDMA)
     } else if (baudrate <= 32000000) {
-        self->spi->init.freq = HAL_SPI_FREQ_32_Mbps;
+        config->frequency = SPIM_FREQUENCY_FREQUENCY_M32; // Temporary value until SPIM support is addressed (EasyDMA)
 #endif
     } else { // Default
-        self->spi->init.freq = HAL_SPI_FREQ_1_Mbps;
+        config->frequency = NRFX_SPI_FREQ_1M;
     }
+
 #ifdef NRF51
-    self->spi->init.irq_priority = 3;
+    config->irq_priority = 3;
 #else
-    self->spi->init.irq_priority = 6;
+    config->irq_priority = 6;
 #endif
-    self->spi->init.mode = HAL_SPI_MODE_CPOL0_CPHA0;
-    self->spi->init.firstbit = (args[ARG_NEW_firstbit].u_int == 0) ? HAL_SPI_MSB_FIRST : HAL_SPI_LSB_FIRST;;
-    hal_spi_master_init(self->spi->instance, &self->spi->init);
+
+    config->mode = NRFX_SPI_MODE_0;
+    config->orc  = 0xFF; // Overrun character
+    config->bit_order = (args[ARG_NEW_firstbit].u_int == 0) ? NRFX_SPI_BIT_ORDER_MSB_FIRST : NRFX_SPI_BIT_ORDER_LSB_FIRST;
+
+    // Set context to this instance of SPI
+    nrfx_spi_init(self->p_spi, config, NULL, (void *)self);
 
     return MP_OBJ_FROM_PTR(self);
 }
 
 STATIC void machine_hard_spi_init(mp_obj_t self_in, mp_arg_val_t *args) {
+    // TODO
 }
 
 STATIC void machine_hard_spi_deinit(mp_obj_t self_in) {
-    machine_hard_spi_obj_t *self = self_in;
-    spi_deinit(self->spi);
+    // TODO
 }
 
 STATIC void machine_hard_spi_transfer(mp_obj_base_t *self_in, size_t len, const uint8_t *src, uint8_t *dest) {

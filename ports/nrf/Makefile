@@ -139,6 +139,7 @@ SRC_LIB += $(addprefix lib/,\
 SRC_NRFX += $(addprefix lib/nrfx/drivers/src/,\
 	nrfx_uart.c \
 	nrfx_twi.c \
+	nrfx_spi.c \
 	)
 
 SRC_C += \
