@@ -29,7 +29,7 @@
 
 #include "nrf_rtc.h"
 
-extern const mp_obj_type_t machine_rtc_type;
+extern const mp_obj_type_t machine_rtcounter_type;
 
 void rtc_init0(void);
 

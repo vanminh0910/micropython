@@ -82,12 +82,12 @@ STATIC int rtc_find(mp_obj_t id) {
         return rtc_id;
     }
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-        "RTC(%d) does not exist", rtc_id));
+        "RTCounter(%d) does not exist", rtc_id));
 }
 
 STATIC void rtc_print(const mp_print_t *print, mp_obj_t o, mp_print_kind_t kind) {
     machine_rtc_obj_t *self = o;
-    mp_printf(print, "RTC(%u)", self->p_config->id);
+    mp_printf(print, "RTCounter(%u)", self->p_config->id);
 }
 
 /******************************************************************************/
@@ -131,7 +131,7 @@ STATIC mp_obj_t machine_rtc_make_new(const mp_obj_type_t *type, size_t n_args, s
 }
 
 /// \method start(period)
-/// Start the RTC timer. Timeout occurs after number of periods
+/// Start the RTCounter. Timeout occurs after number of periods
 /// in the configured frequency has been reached.
 ///
 STATIC mp_obj_t machine_rtc_start(mp_obj_t self_in) {
@@ -144,7 +144,7 @@ STATIC mp_obj_t machine_rtc_start(mp_obj_t self_in) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(machine_rtc_start_obj, machine_rtc_start);
 
 /// \method stop()
-/// Stop the RTC timer.
+/// Stop the RTCounter.
 ///
 STATIC mp_obj_t machine_rtc_stop(mp_obj_t self_in) {
     machine_rtc_obj_t * self = MP_OBJ_TO_PTR(self_in);
@@ -167,9 +167,9 @@ STATIC const mp_rom_map_elem_t machine_rtc_locals_dict_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(machine_rtc_locals_dict, machine_rtc_locals_dict_table);
 
-const mp_obj_type_t machine_rtc_type = {
+const mp_obj_type_t machine_rtcounter_type = {
     { &mp_type_type },
-    .name = MP_QSTR_RTC,
+    .name = MP_QSTR_RTCounter,
     .print = rtc_print,
     .make_new = machine_rtc_make_new,
     .locals_dict = (mp_obj_dict_t*)&machine_rtc_locals_dict
