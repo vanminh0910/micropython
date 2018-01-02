@@ -73,8 +73,8 @@ STATIC int i2c_find(mp_obj_t id) {
         "I2C(%d) does not exist", i2c_id));
 }
 
-STATIC void machine_hard_i2c_print(const mp_print_t *print, mp_obj_t o, mp_print_kind_t kind) {
-    machine_hard_i2c_obj_t *self = o;
+STATIC void machine_hard_i2c_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
+    machine_hard_i2c_obj_t *self = self_in;
     mp_printf(print, "I2C(%u, scl_pin=%u, sda_pin=%u, frequency=%lu, irq_prio=%u)",
               self->id,
               self->config.scl,
