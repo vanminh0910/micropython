@@ -51,8 +51,8 @@
 #if MICROPY_PY_MACHINE_TEMP
 #include "temp.h"
 #endif
-#if MICROPY_PY_MACHINE_RTC
-#include "rtc.h"
+#if MICROPY_PY_MACHINE_RTCOUNTER
+#include "rtcounter.h"
 #endif
 
 #define PYB_RESET_HARD      (0)

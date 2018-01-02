@@ -50,10 +50,10 @@ static hal_rtc_conf_t rtc_config2 = {.id = 2};
 #endif
 
 STATIC machine_rtc_obj_t machine_rtc_obj[] = {
-    {{&machine_rtc_type}, &rtc_config0},
-    {{&machine_rtc_type}, &rtc_config1},
+    {{&machine_rtcounter_type}, &rtc_config0},
+    {{&machine_rtcounter_type}, &rtc_config1},
 #if NRF52
-    {{&machine_rtc_type}, &rtc_config2},
+    {{&machine_rtcounter_type}, &rtc_config2},
 #endif
 };
 
