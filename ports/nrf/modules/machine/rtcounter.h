@@ -24,8 +24,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef RTC_H__
-#define RTC_H__
+#ifndef RTCOUNTER_H__
+#define RTCOUNTER_H__
 
 #include "nrf_rtc.h"
 
@@ -33,4 +33,4 @@ extern const mp_obj_type_t machine_rtc_type;
 
 void rtc_init0(void);
 
-#endif // RTC_H__
+#endif // RTCOUNTER_H__

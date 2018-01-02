@@ -162,7 +162,7 @@ DRIVERS_SRC_C += $(addprefix modules/,\
 	machine/adc.c \
 	machine/pin.c \
 	machine/timer.c \
-	machine/rtc.c \
+	machine/rtcounter.c \
 	machine/pwm.c \
 	machine/led.c \
 	machine/temp.c \

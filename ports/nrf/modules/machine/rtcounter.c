@@ -30,10 +30,10 @@
 #include "py/nlr.h"
 #include "py/runtime.h"
 #include "py/mphal.h"
-#include "rtc.h"
+#include "rtcounter.h"
 #include "nrf_rtc.h"
 
-#if MICROPY_PY_MACHINE_RTC
+#if MICROPY_PY_MACHINE_RTCOUNTER
 
 typedef struct _machine_rtc_obj_t {
     mp_obj_base_t    base;
@@ -175,4 +175,4 @@ const mp_obj_type_t machine_rtc_type = {
     .locals_dict = (mp_obj_dict_t*)&machine_rtc_locals_dict
 };
 
-#endif // MICROPY_PY_MACHINE_RTC
+#endif // MICROPY_PY_MACHINE_RTCOUNTER
