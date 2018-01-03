@@ -98,7 +98,11 @@ static MBRCONST struct {
     1,
     PAGE_SIZE_LOG2,
     FLASH_SIZE /  PAGE_SIZE,
-    {'N', '5', '1', 'a'}, // TODO: expand to nRF52
+#if NRF51
+    {'N', '5', '1', 'a'},
+#elif NRF52
+    {'N', '5', '2', 'a'},
+#endif
     APP_CODE_BASE / PAGE_SIZE,
     (APP_BOOTLOADER_BASE / PAGE_SIZE) - (APP_CODE_BASE / PAGE_SIZE),
 };
@@ -427,9 +431,30 @@ static void ble_evt_handler(ble_evt_t * p_ble_evt) {
             LOG("ble: sys attr missing");
             break;
 
+#if NRF52
+        case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
+            LOG("ble: exchange MTU request");
+            sd_ble_gatts_exchange_mtu_reply(p_ble_evt->evt.gatts_evt.conn_handle, GATT_MTU_SIZE_DEFAULT);
+            break;
+#endif
+
         case BLE_EVT_TX_COMPLETE:
             //LOG("ble: tx complete");
             break;
+
+#if NRF52
+        case BLE_GAP_EVT_ADV_REPORT:
+            LOG("ble: adv report");
+            break;
+
+        case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
+            LOG("ble: conn param update request");
+            break;
+
+        case BLE_GATTC_EVT_PRIM_SRVC_DISC_RSP:
+            LOG("ble: prim srvc disc rsp");
+            break;
+#endif
 
         default: {
             LOG("ble: ???");

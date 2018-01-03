@@ -71,6 +71,15 @@ static void jump_to_app() {
 uint8_t flash_buf[PAGE_SIZE];
 uint8_t *flash_buf_ptr;
 
+#if !NRF51
+static MBRCONST nrf_clock_lf_cfg_t clock_config = {
+    .source = NRF_CLOCK_LF_SRC_SYNTH,
+    .rc_ctiv = 0,
+    .rc_temp_ctiv = 0,
+    .xtal_accuracy = 0,
+};
+#endif
+
 void _start(void) {
 #if DEBUG
     uart_enable();
@@ -114,14 +123,7 @@ void _start(void) {
     LOG("enable sd");
     #if NRF51
     sd_softdevice_enable(NRF_CLOCK_LFCLKSRC_RC_250_PPM_250MS_CALIBRATION, softdevice_assert_handler);
-    #elif NRF52
-    // TODO: put in global static constant?
-    nrf_clock_lf_cfg_t clock_config = {
-        .source = NRF_CLOCK_LF_SRC_SYNTH,
-        .rc_ctiv = 0,
-        .rc_temp_ctiv = 0,
-        .xtal_accuracy = 0,
-    };
+    #else
     sd_softdevice_enable(&clock_config, softdevice_assert_handler);
     #endif
 
