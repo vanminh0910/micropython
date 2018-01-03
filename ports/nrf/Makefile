@@ -237,8 +237,6 @@ ISR_VECTOR_COUNT = 42
 else ifeq ($(SD),s132)
 BOOTLOADERLD = bootloader/nrf52_s132_3.0.0_$(LD_TYPE).ld
 ISR_VECTOR_COUNT = 54
-else
-$(error Unknown SoftDevice)
 endif
 
 $(BUILD)/bootloader.hex: $(BUILD)/bootloader.elf

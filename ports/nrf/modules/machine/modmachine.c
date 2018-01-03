@@ -55,8 +55,8 @@
 #include "rtc.h"
 #endif
 
-#include "nrf_sdm.h"
 #if BLUETOOTH_SD
+#include "nrf_sdm.h"
 #include "ble_drv.h"
 #if NRF52
 #include "nrf_nvic.h"
@@ -156,6 +156,7 @@ STATIC mp_obj_t machine_reset(mp_uint_t n_args, const mp_obj_t *args) {
     if (n_args > 0) {
         bootmode = mp_obj_get_int(args[0]);
     }
+    #if BLUETOOTH_SD
     if (BLUETOOTH_STACK_ENABLED()) {
         #if NRF51
         sd_power_gpregret_clr(0xff); // clear all bits - there are only 8 bits
@@ -165,7 +166,9 @@ STATIC mp_obj_t machine_reset(mp_uint_t n_args, const mp_obj_t *args) {
         sd_power_gpregret_set(0, bootmode);
         #endif
         sd_nvic_SystemReset();
-    } else {
+    } else
+    #endif
+    {
         NRF_POWER->GPREGRET = bootmode;
         NVIC_SystemReset();
     }
