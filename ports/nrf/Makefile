@@ -244,9 +244,11 @@ endif
 $(BUILD)/bootloader.hex: $(BUILD)/bootloader.elf
 	$(ECHO) "HEX $@"
 	$(Q)$(OBJCOPY) -O ihex $< $@
-	$(Q)if [ "$(MBR)" -eq "1" ]; then bootloader/patch-isr-vector.py $(SOFTDEV_HEX) $@ $(ISR_VECTOR_COUNT); fi
 
-$(BUILD)/bootloader.elf: bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup.c
+$(BUILD)/genhdr/isr-vector.h:
+	$(Q)$(PYTHON) bootloader/extract-isr-vector.py $(SOFTDEV_HEX) $@ $(ISR_VECTOR_COUNT)
+
+$(BUILD)/bootloader.elf: bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup.c $(BUILD)/genhdr/isr-vector.h
 	$(ECHO) "CCLD $@"
 	$(Q)$(MKDIR) -p $(BUILD)
 	$(Q)$(CC) $(CFLAGS) -T $(BOOTLOADERLD) -DBOOTLOADER_IN_MBR=$(MBR) -Wl,--gc-sections -flto -o $@ bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup.c
