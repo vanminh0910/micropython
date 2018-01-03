@@ -51,8 +51,17 @@ static MBRCONST struct {
 };
 
 static ble_enable_params_t ble_enable_params = {
-    .gatts_enable_params.attr_tab_size = BLE_GATTS_ATTR_TAB_SIZE_DEFAULT,
+    #if NRF52
+    .common_enable_params.p_conn_bw_counts = NULL,
+    .common_enable_params.vs_uuid_count = 1,
+    .gap_enable_params.periph_conn_count = 1,
+    .gap_enable_params.central_conn_count = 0,
+    .gap_enable_params.central_sec_count = 0,
+    .gap_enable_params.p_device_name = NULL,
+    .gatt_enable_params.att_mtu = 0, // default
+    #endif
     .gatts_enable_params.service_changed = 0,
+    .gatts_enable_params.attr_tab_size = BLE_GATTS_ATTR_TAB_SIZE_DEFAULT,
 };
 
 static MBRCONST ble_gap_conn_params_t gap_conn_params = {
@@ -90,8 +99,8 @@ static MBRCONST struct {
     PAGE_SIZE_LOG2,
     FLASH_SIZE /  PAGE_SIZE,
     {'N', '5', '1', 'a'}, // TODO: expand to nRF52
-    APPLICATION_START_ADDR / PAGE_SIZE,
-    (APPLICATION_END_ADDR / PAGE_SIZE) - (APPLICATION_START_ADDR / PAGE_SIZE),
+    APP_CODE_BASE / PAGE_SIZE,
+    (APP_BOOTLOADER_BASE / PAGE_SIZE) - (APP_CODE_BASE / PAGE_SIZE),
 };
 
 static ble_uuid_t uuid;
@@ -194,12 +203,36 @@ ble_gatts_char_handles_t char_buffer_handles;
 
 static uint16_t ble_command_conn_handle;
 
+#if !NRF51
+static MBRCONST uint32_t app_ram_base = APP_RAM_BASE;
+#endif
+
 void ble_init(void) {
     LOG("enable ble");
 
     // Enable BLE stack.
-    if (sd_ble_enable(&ble_enable_params) != 0) {
-        LOG("Cannot enable BLE");
+
+    #if NRF51
+    uint32_t err_code = sd_ble_enable(&ble_enable_params);
+    #else
+    uint32_t err_code = sd_ble_enable(&ble_enable_params, &app_ram_base);
+    #endif
+    if (err_code != 0) {
+        if (err_code == NRF_ERROR_INVALID_STATE) {
+            LOG("Cannot enable BLE: invalid state");
+        } else if (err_code == NRF_ERROR_INVALID_ADDR) {
+            LOG("Cannot enable BLE: invalid address");
+        } else if (err_code == NRF_ERROR_INVALID_LENGTH) {
+            LOG("Cannot enable BLE: invalid length");
+        } else if (err_code == NRF_ERROR_INVALID_PARAM) {
+            LOG("Cannot enable BLE: invalid param");
+        } else if (err_code == NRF_ERROR_NOT_SUPPORTED) {
+            LOG("Cannot enable BLE: not supported");
+        } else if (err_code == NRF_ERROR_NO_MEM) {
+            LOG("Cannot enable BLE: no mem");
+        } else {
+            LOG("Cannot enable BLE: ?");
+        }
     }
 
     LOG("sd_ble_gap_device_name_set");
@@ -392,10 +425,6 @@ static void ble_evt_handler(ble_evt_t * p_ble_evt) {
 
         case BLE_GATTS_EVT_SYS_ATTR_MISSING:
             LOG("ble: sys attr missing");
-            break;
-
-        case BLE_ERROR_NO_TX_BUFFERS:
-            LOG("ble: ! no tx buffers");
             break;
 
         case BLE_EVT_TX_COMPLETE:

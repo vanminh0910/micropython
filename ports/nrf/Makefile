@@ -226,20 +226,30 @@ bootloader: $(BUILD)/bootloader.hex
 
 MBR ?= 0
 ifeq ($(MBR),1)
-BOOTLOADERLD = bootloader/nrf51x22_256k_16k_s110_8.0.0_mbr.ld
+LD_TYPE = mbr
 else
-BOOTLOADERLD = bootloader/nrf51x22_256k_16k_s110_8.0.0_bootloader.ld
+LD_TYPE = bootloader
+endif
+
+ifeq ($(SD),s110)
+BOOTLOADERLD = bootloader/nrf51x22_256k_16k_s110_8.0.0_$(LD_TYPE).ld
+ISR_VECTOR_COUNT = 42
+else ifeq ($(SD),s132)
+BOOTLOADERLD = bootloader/nrf52_s132_3.0.0_$(LD_TYPE).ld
+ISR_VECTOR_COUNT = 54
+else
+$(error Unknown SoftDevice)
 endif
 
 $(BUILD)/bootloader.hex: $(BUILD)/bootloader.elf
 	$(ECHO) "HEX $@"
 	$(Q)$(OBJCOPY) -O ihex $< $@
-	$(Q)if [ $(MBR) -eq "1" ]; then bootloader/patch-isr-vector.py $(SOFTDEV_HEX) $@; fi
+	$(Q)if [ "$(MBR)" -eq "1" ]; then bootloader/patch-isr-vector.py $(SOFTDEV_HEX) $@ $(ISR_VECTOR_COUNT); fi
 
-$(BUILD)/bootloader.elf: bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup_$(MCU_SUB_VARIANT).c
+$(BUILD)/bootloader.elf: bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup.c
 	$(ECHO) "CCLD $@"
 	$(Q)$(MKDIR) -p $(BUILD)
-	$(Q)$(CC) $(CFLAGS) -T $(BOOTLOADERLD) -DBOOTLOADER_IN_MBR=$(MBR) -Wl,--gc-sections -flto -o $@ bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup_$(MCU_SUB_VARIANT).c
+	$(Q)$(CC) $(CFLAGS) -T $(BOOTLOADERLD) -DBOOTLOADER_IN_MBR=$(MBR) -Wl,--gc-sections -flto -o $@ bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup.c
 	$(Q)$(SIZE) $@
 
 OUTPUT_FILENAME = firmware

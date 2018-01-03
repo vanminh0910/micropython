@@ -69,4 +69,4 @@ def patch_isr_vector(inpath, outpath, vector_start, vector_end):
     f.close()
 
 if __name__ == '__main__':
-    patch_isr_vector(sys.argv[1], sys.argv[2], 2, 42)
+    patch_isr_vector(sys.argv[1], sys.argv[2], 2, int(sys.argv[3]))

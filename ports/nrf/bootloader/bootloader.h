@@ -18,13 +18,22 @@
 extern const uint32_t _stext[];
 
 #define BOOTLOADER_START_ADDR  (_stext)
-#define SOFTDEVICE_START_ADDR  (0x00001000)
-#define APPLICATION_START_ADDR (0x00018000)
-#define APPLICATION_END_ADDR   (0x0003b000)
+#define SD_CODE_BASE           (0x00001000)
 #define MBR_VECTOR_TABLE       (0x20000000)
-#define FLASH_SIZE             (0x00040000)
+#define FLASH_SIZE             (0x00040000) // TODO: put real value in here for nRF52
+#define APP_BOOTLOADER_BASE    (0x0003B000) // TODO: put something sensible in here
+
+#if NRF51
+#define APP_CODE_BASE          (0x00018000)
+#define APP_RAM_BASE           (0x20002000)
 #define PAGE_SIZE              (1024)
 #define PAGE_SIZE_LOG2         (10)
+#else
+#define APP_CODE_BASE          (0x0001C000)
+#define APP_RAM_BASE           (0x20002800)
+#define PAGE_SIZE              (4096)
+#define PAGE_SIZE_LOG2         (12)
+#endif
 
 #define COMMAND_RESET        (0x01) // do a reset
 #define COMMAND_ERASE_PAGE   (0x02) // start erasing this page

@@ -8,6 +8,9 @@
 #include "nrf_sdm.h"
 #include "nrf_mbr.h"
 #include "nrf_soc.h"
+#if NRF52
+#include "nrf_nvic.h"
+#endif
 
 #include "bootloader.h"
 #include "bootloader_ble.h"
@@ -18,13 +21,21 @@ const uint32_t *bootloaderaddr = BOOTLOADER_START_ADDR;
 #endif
 
 #if DEBUG
+#if NRF51
 static void softdevice_assert_handler(uint32_t pc, uint16_t line_number, const uint8_t * p_file_name) {
+#else
+static void softdevice_assert_handler(uint32_t id, uint32_t pc, uint32_t info) {
+#endif
     LOG("ERROR: SoftDevice assert!!!");
     while (1);
 }
 #else
 void HardFault_Handler(void);
+#if NRF51
 #define softdevice_assert_handler ((softdevice_assertion_handler_t)HardFault_Handler)
+#else
+#define softdevice_assert_handler ((nrf_fault_handler_t)HardFault_Handler)
+#endif
 #endif
 
 static void jump_to_app() {
@@ -35,7 +46,7 @@ static void jump_to_app() {
     // function.
 
 #if BOOTLOADER_IN_MBR
-    *(uint32_t*)MBR_VECTOR_TABLE = SOFTDEVICE_START_ADDR;
+    *(uint32_t*)MBR_VECTOR_TABLE = SD_CODE_BASE;
 #endif
 
     // The ISR vector contains these entries (among others):
@@ -44,7 +55,7 @@ static void jump_to_app() {
     // Note that we can't just jump to the app, we have to 'reset' the
     // stack pointer to the beginning of the stack (e.g. the highest
     // address).
-    uint32_t *sd_isr = (uint32_t*)SOFTDEVICE_START_ADDR;
+    uint32_t *sd_isr = (uint32_t*)SD_CODE_BASE;
     uint32_t new_sp = sd_isr[0]; // load end of stack (_estack)
     uint32_t new_pc = sd_isr[1]; // load Reset_Handler
     __asm__ __volatile__(
@@ -72,7 +83,7 @@ void _start(void) {
 #if BOOTLOADER_IN_MBR
     *(uint32_t*)MBR_VECTOR_TABLE = 0;
 #else
-    *(uint32_t*)MBR_VECTOR_TABLE = SOFTDEVICE_START_ADDR;
+    *(uint32_t*)MBR_VECTOR_TABLE = SD_CODE_BASE;
 #endif
 
 
@@ -81,7 +92,7 @@ void _start(void) {
     // 0xffffffff.
     // Also, check whether GPREGRET is set: if it is, the application has
     // requested we stay in DFU mode.
-    uint32_t *app_isr = (uint32_t*)APPLICATION_START_ADDR;
+    uint32_t *app_isr = (uint32_t*)APP_CODE_BASE;
     uint32_t reset_handler = app_isr[1];
     if (reset_handler != 0xffffffff && NRF_POWER->GPREGRET == 0) {
         // There is a valid application and the application hasn't
@@ -101,7 +112,18 @@ void _start(void) {
     // DFU mode isn't meant to be enabled for long periods anyway. It
     // avoids having to configure internal/external clocks.
     LOG("enable sd");
+    #if NRF51
     sd_softdevice_enable(NRF_CLOCK_LFCLKSRC_RC_250_PPM_250MS_CALIBRATION, softdevice_assert_handler);
+    #elif NRF52
+    // TODO: put in global static constant?
+    nrf_clock_lf_cfg_t clock_config = {
+        .source = NRF_CLOCK_LF_SRC_SYNTH,
+        .rc_ctiv = 0,
+        .rc_temp_ctiv = 0,
+        .xtal_accuracy = 0,
+    };
+    sd_softdevice_enable(&clock_config, softdevice_assert_handler);
+    #endif
 
     // Enable IRQ for SoftDevice.
     // Disabled as it is not necessary as all events are handled in
@@ -142,7 +164,7 @@ void handle_command(uint16_t data_len, ble_command_t *cmd) {
     } else if (cmd->any.command == COMMAND_WRITE_BUFFER) {
         LOG("command: do write");
 #if FLASH_PAGE_CHECKS
-        if (cmd->write.page < APPLICATION_START_ADDR / PAGE_SIZE || (!BOOTLOADER_IN_MBR && cmd->write.page >= (uint32_t)BOOTLOADER_START_ADDR / PAGE_SIZE)) {
+        if (cmd->write.page < APP_CODE_BASE / PAGE_SIZE || (!BOOTLOADER_IN_MBR && cmd->write.page >= (uint32_t)BOOTLOADER_START_ADDR / PAGE_SIZE)) {
             if (ERROR_REPORTING) {
                 ble_send_reply(1);
             }
