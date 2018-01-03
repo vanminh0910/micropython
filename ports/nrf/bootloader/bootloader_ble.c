@@ -35,6 +35,9 @@ static MBRCONST ble_uuid128_t uuid_base = {
 
 static MBRCONST uint8_t device_name[] = DEVICE_NAME;
 static MBRCONST struct {
+    uint8_t flags_len;
+    uint8_t flags_type;
+    uint8_t flags_value;
     uint8_t name_len;
     uint8_t name_type;
     uint8_t name_value[sizeof(device_name)];
@@ -42,6 +45,9 @@ static MBRCONST struct {
     uint8_t uuid_type;
     uint8_t uuid_value[16];
 } adv_data = {
+    2,
+    BLE_GAP_AD_TYPE_FLAGS,
+    BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE,
     sizeof(device_name) + 1, // type + name
     BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME,
     DEVICE_NAME,
