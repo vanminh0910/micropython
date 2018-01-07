@@ -254,13 +254,9 @@ OBJ += $(BUILD)/pins_gen.o
 $(BUILD)/$(FATFS_DIR)/ff.o: COPT += -Os
 $(filter $(PY_BUILD)/../extmod/vfs_fat_%.o, $(PY_O)): COPT += -Os
 
-.PHONY: all flash sd binary hex bootloader mbr
+.PHONY: all flash sd binary hex
 
 all: binary hex
-
-# TODO remove
-bootloader: $(BUILD)/dfu_bootloader.hex
-mbr: $(BUILD)/dfu_mbr.hex
 
 $(BUILD)/dfu:
 	$(Q)$(MKDIR) -p $@
