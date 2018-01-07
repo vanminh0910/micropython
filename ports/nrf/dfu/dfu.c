@@ -38,10 +38,10 @@
 #include "nrf_nvic.h"
 #endif
 
-#include "bootloader.h"
-#include "bootloader_ble.h"
+#include "dfu.h"
+#include "dfu_ble.h"
 
-#if !BOOTLOADER_IN_MBR
+#if defined(DFU_TYPE_bootloader)
 __attribute__((section(".bootloaderaddr"),used))
 const uint32_t *bootloaderaddr = BOOTLOADER_START_ADDR;
 #endif
@@ -71,7 +71,7 @@ static void jump_to_app() {
     // Note that the SoftDevice needs to be disabled before calling this
     // function.
 
-#if BOOTLOADER_IN_MBR
+#if defined(DFU_TYPE_mbr)
     *(uint32_t*)MBR_VECTOR_TABLE = SD_CODE_BASE;
 #endif
 
@@ -115,9 +115,9 @@ void _start(void) {
 
     // Set the vector table. This may be used by the SoftDevice.
     LOG("init MBR vector table");
-#if BOOTLOADER_IN_MBR
+#if defined(DFU_TYPE_mbr)
     *(uint32_t*)MBR_VECTOR_TABLE = 0;
-#else
+#elif defined(DFU_TYPE_bootloader)
     *(uint32_t*)MBR_VECTOR_TABLE = SD_CODE_BASE;
 #endif
 
@@ -192,7 +192,11 @@ void handle_command(uint16_t data_len, ble_command_t *cmd) {
     } else if (cmd->any.command == COMMAND_WRITE_BUFFER) {
         LOG("command: do write");
 #if FLASH_PAGE_CHECKS
-        if (cmd->write.page < APP_CODE_BASE / PAGE_SIZE || (!BOOTLOADER_IN_MBR && cmd->write.page >= (uint32_t)BOOTLOADER_START_ADDR / PAGE_SIZE)) {
+        if (cmd->write.page < APP_CODE_BASE / PAGE_SIZE
+            #ifdef DFU_TYPE_mbr
+            || cmd->write.page >= (uint32_t)BOOTLOADER_START_ADDR / PAGE_SIZE
+            #endif
+            ) {
             if (ERROR_REPORTING) {
                 ble_send_reply(1);
             }

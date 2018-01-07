@@ -16,4 +16,4 @@ MEMORY
 /*_stack_end = ORIGIN(RAM) + LENGTH(RAM);*/
 _estack = ORIGIN(RAM) + LENGTH(RAM);
 
-INCLUDE "bootloader/common.ld"
+INCLUDE "dfu/common.ld"

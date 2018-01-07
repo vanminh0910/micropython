@@ -74,7 +74,7 @@ void Reset_Handler(void) {
     ram_on_b_addr = 1 << 17;
 #endif
 
-#if BOOTLOADER_IN_MBR
+#if defined(DFU_TYPE_mbr)
     // Initialize .data segment. By avoiding non-zero non-const values, we
     // can also avoid this startup code. Saves 36 bytes.
     uint32_t * p_src  = &_sidata;
@@ -102,7 +102,7 @@ void HardFault_Handler      (void) __attribute__ ((weak, alias("Default_Handler"
 const func __Vectors[] __attribute__ ((section(".isr_vector"),used)) = {
     (func)&_estack,
     Reset_Handler,
-    NMI_Handler,
+    NMI_Handler, // TODO: should this one be redirected to the SoftDevice?
     HardFault_Handler,
     // Dirty hack to save space: the following IRQs aren't used by the
     // bootloader so we can put anything in this space. It saves 152
@@ -111,7 +111,7 @@ const func __Vectors[] __attribute__ ((section(".isr_vector"),used)) = {
     // selecting readonly literals). This to ensure that even if an
     // interrupt gets called here, the CPU will fault (as function
     // pointers must always have the lowest bit set in Thumb mode).
-#if BOOTLOADER_IN_MBR
+#if defined(DFU_TYPE_mbr)
     ISR_VECTOR_4,
     ISR_VECTOR_5,
     ISR_VECTOR_6,

@@ -26,9 +26,9 @@
 
 
 #include "device/nrf.h"
-#include "bootloader.h"
+#include "dfu.h"
 #include "mpconfigboard.h"
-#include "bootloader_uart.h"
+#include "dfu_uart.h"
 
 
 void uart_write_char(char ch) {

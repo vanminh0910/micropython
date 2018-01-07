@@ -29,9 +29,9 @@
 #include <stddef.h>
 #include "ble.h"
 #include "nrf_sdm.h"
-#include "bootloader.h"
-#include "bootloader_ble.h"
-#include "bootloader_uart.h"
+#include "dfu.h"
+#include "dfu_ble.h"
+#include "dfu_uart.h"
 
 #define MSEC_TO_UNITS(TIME, RESOLUTION) (((TIME) * 1000) / (RESOLUTION))
 #define UNIT_0_625_MS (625)

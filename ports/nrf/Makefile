@@ -24,6 +24,25 @@ else
 	include boards/$(BOARD)/mpconfigboard_$(SD_LOWER).mk
 
 	include drivers/bluetooth/bluetooth_common.mk
+
+	# Build with DFU enabled if the SD is also enabled.
+	DFU ?= mbr
+endif
+
+ifeq ($(DFU),)
+DFU := none
+else ifeq ($(DFU),mbr)
+else ifeq ($(DFU),bootloader)
+else
+$(error DFU type unknown: $(DFU) (must be dfu, mbr or none))
+endif
+
+ifneq ($(DFU),none)
+ifeq ($(SD),s110)
+BOOTLOADERLD = dfu/nrf51x22_256k_16k_s110_8.0.0_$(DFU).ld
+else ifeq ($(SD),s132)
+BOOTLOADERLD = dfu/nrf52_s132_3.0.0_$(DFU).ld
+endif
 endif
 
 ifeq ($(shell test -e boards/$(BOARD)/modules/boardmodules.mk && echo -n yes),yes)
@@ -78,6 +97,7 @@ CFLAGS += -fno-strict-aliasing
 CFLAGS += -fstack-usage
 CFLAGS += -Iboards/$(BOARD)
 CFLAGS += -DNRF5_HAL_H='<$(MCU_VARIANT)_hal.h>'
+CFLAGS += -DDFU_TYPE_$(DFU)
 CFLAGS += -flto
 
 LDFLAGS = $(CFLAGS)
@@ -206,6 +226,20 @@ SRC_C += \
 	device/$(MCU_VARIANT)/system_$(MCU_SUB_VARIANT).c \
 	device/$(MCU_VARIANT)/startup_$(MCU_SUB_VARIANT).c \
 
+DFU_SRC_C := $(addprefix dfu/,\
+	 dfu.c \
+	 dfu_uart.c \
+	 dfu_ble.c \
+	 startup.c \
+	 )
+
+DFU_OBJ := $(addprefix $(BUILD)/, $(DFU_SRC_C:.c=.o))
+
+# Create build directories and isr-vector.h before compiling DFU_OBJ files.
+$(DFU_OBJ): | $(BUILD)/dfu
+$(DFU_OBJ): | $(HEADER_BUILD)
+$(DFU_OBJ): | $(HEADER_BUILD)/isr-vector.h
+
 FROZEN_MPY_PY_FILES := $(shell find -L $(FROZEN_MPY_DIR) -type f -name '*.py')
 FROZEN_MPY_MPY_FILES := $(addprefix $(BUILD)/,$(FROZEN_MPY_PY_FILES:.py=.mpy))
 
@@ -218,38 +252,27 @@ OBJ += $(BUILD)/pins_gen.o
 $(BUILD)/$(FATFS_DIR)/ff.o: COPT += -Os
 $(filter $(PY_BUILD)/../extmod/vfs_fat_%.o, $(PY_O)): COPT += -Os
 
-.PHONY: all flash sd binary hex bootloader
+.PHONY: all flash sd binary hex bootloader mbr
 
 all: binary hex
 
-bootloader: $(BUILD)/bootloader.hex
+# TODO remove
+bootloader: $(BUILD)/dfu_bootloader.hex
+mbr: $(BUILD)/dfu_mbr.hex
 
-MBR ?= 0
-ifeq ($(MBR),1)
-LD_TYPE = mbr
-else
-LD_TYPE = bootloader
-endif
+$(BUILD)/dfu:
+	$(Q)$(MKDIR) -p $@
 
-ifeq ($(SD),s110)
-BOOTLOADERLD = bootloader/nrf51x22_256k_16k_s110_8.0.0_$(LD_TYPE).ld
-ISR_VECTOR_COUNT = 42
-else ifeq ($(SD),s132)
-BOOTLOADERLD = bootloader/nrf52_s132_3.0.0_$(LD_TYPE).ld
-ISR_VECTOR_COUNT = 54
-endif
-
-$(BUILD)/bootloader.hex: $(BUILD)/bootloader.elf
+$(BUILD)/dfu_$(DFU).hex: $(BUILD)/dfu_$(DFU).elf
 	$(ECHO) "HEX $@"
 	$(Q)$(OBJCOPY) -O ihex $< $@
 
-$(BUILD)/genhdr/isr-vector.h:
-	$(Q)$(PYTHON) bootloader/extract-isr-vector.py $(SOFTDEV_HEX) $@ $(ISR_VECTOR_COUNT)
+$(HEADER_BUILD)/isr-vector.h:
+	$(Q)$(PYTHON) dfu/extract-isr-vector.py "$(SOFTDEV_HEX)" "$@" 54
 
-$(BUILD)/bootloader.elf: bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup.c $(BUILD)/genhdr/isr-vector.h
-	$(ECHO) "CCLD $@"
-	$(Q)$(MKDIR) -p $(BUILD)
-	$(Q)$(CC) $(CFLAGS) -T $(BOOTLOADERLD) -DBOOTLOADER_IN_MBR=$(MBR) -Wl,--gc-sections -flto -o $@ bootloader/bootloader.c bootloader/bootloader_uart.c bootloader/bootloader_ble.c bootloader/startup.c
+$(BUILD)/dfu_$(DFU).elf: $(DFU_OBJ)
+	$(ECHO) "LINK $@"
+	$(Q)$(CC) $(CFLAGS) -T $(BOOTLOADERLD) -Wl,--gc-sections -flto -o $@ $(DFU_OBJ)
 	$(Q)$(SIZE) $@
 
 OUTPUT_FILENAME = firmware

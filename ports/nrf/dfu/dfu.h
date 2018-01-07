@@ -28,7 +28,7 @@
 #pragma once
 
 #include "mpconfigboard.h"
-#include "bootloader_uart.h"
+#include "dfu_uart.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -48,7 +48,7 @@ extern const uint32_t _stext[];
 #define SD_CODE_BASE           (0x00001000)
 #define MBR_VECTOR_TABLE       (0x20000000)
 
-#if BOOTLOADER_IN_MBR
+#if defined(DFU_TYPE_mbr)
 #define APP_BOOTLOADER_SIZE    (0)
 #else
 #define APP_BOOTLOADER_SIZE    (0x5000) // TODO: this is incorrect
@@ -88,7 +88,7 @@ extern const uint32_t _stext[];
 #define COMMAND_PING         (0x10) // just ask a response (debug)
 #define COMMAND_START        (0x11) // start the app (debug, unreliable)
 
-#if BOOTLOADER_IN_MBR
+#if defined(DFU_TYPE_mbr)
 #define MBRCONST
 #else
 #define MBRCONST const
