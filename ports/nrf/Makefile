@@ -40,8 +40,10 @@ endif
 ifneq ($(DFU),none)
 ifeq ($(SD),s110)
 BOOTLOADERLD = dfu/nrf51x22_256k_16k_s110_8.0.0_$(DFU).ld
+PAGESIZE = 1024
 else ifeq ($(SD),s132)
 BOOTLOADERLD = dfu/nrf52_s132_3.0.0_$(DFU).ld
+PAGESIZE = 4096
 endif
 endif
 
@@ -275,47 +277,47 @@ $(BUILD)/dfu_$(DFU).elf: $(DFU_OBJ)
 	$(Q)$(CC) $(CFLAGS) -T $(BOOTLOADERLD) -Wl,--gc-sections -flto -o $@ $(DFU_OBJ)
 	$(Q)$(SIZE) $@
 
-OUTPUT_FILENAME = firmware
+## Create binary .bin file from the .hex file
+binary: $(BUILD)/firmware.bin
 
-## Create binary .bin file from the .out file
-binary: $(BUILD)/$(OUTPUT_FILENAME).bin
+$(BUILD)/firmware.bin: $(BUILD)/firmware.hex
+	$(OBJCOPY) -O binary -I ihex $< $@
 
-$(BUILD)/$(OUTPUT_FILENAME).bin: $(BUILD)/$(OUTPUT_FILENAME).elf
-	$(OBJCOPY) -O binary $< $@
+## Create binary .hex file from the .elf file
+hex: $(BUILD)/firmware.hex
 
-## Create binary .hex file from the .out file
-hex: $(BUILD)/$(OUTPUT_FILENAME).hex
+$(BUILD)/firmware.hex: $(SOFTDEV_HEX) $(BUILD)/dfu_$(DFU).hex $(BUILD)/application.hex
+	$(PYTHON) dfu/mergehex.py --pagesize $(PAGESIZE) $@ $^
 
-$(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).elf
+$(BUILD)/application.hex: $(BUILD)/application.elf
 	$(OBJCOPY) -O ihex $< $@
 
 FLASHER ?=
 
 ifeq ($(FLASHER),)
 
-flash: $(BUILD)/$(OUTPUT_FILENAME).hex
+flash: $(BUILD)/application.hex
 	nrfjprog --program $< --sectorerase -f $(MCU_VARIANT)
 	nrfjprog --reset -f $(MCU_VARIANT)
 
-sd: $(BUILD)/$(OUTPUT_FILENAME).hex
+sd: $(BUILD)/firmware.hex
 	nrfjprog --eraseall -f $(MCU_VARIANT)
-	nrfjprog --program $(SOFTDEV_HEX) -f $(MCU_VARIANT)
-	nrfjprog --program $< --sectorerase -f $(MCU_VARIANT)
+	nrfjprog --program $(BUILD)/firmware.hex -f $(MCU_VARIANT)
 	nrfjprog --reset -f $(MCU_VARIANT)
 
 else ifeq ($(FLASHER), pyocd)
 
-flash: $(BUILD)/$(OUTPUT_FILENAME).hex
+flash: $(BUILD)/application.hex
 	pyocd-flashtool -t $(MCU_VARIANT) $<
 
-sd: $(BUILD)/$(OUTPUT_FILENAME).hex
+sd: $(BUILD)/application.hex
 	pyocd-flashtool -t $(MCU_VARIANT) --chip_erase
 	pyocd-flashtool -t $(MCU_VARIANT) $(SOFTDEV_HEX)
 	pyocd-flashtool -t $(MCU_VARIANT) $<
 
 endif
 
-$(BUILD)/$(OUTPUT_FILENAME).elf: $(OBJ)
+$(BUILD)/application.elf: $(OBJ)
 	$(ECHO) "LINK $@"
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(OBJ) $(LIBS)
 	$(Q)$(SIZE) $@
