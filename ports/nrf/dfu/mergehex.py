@@ -63,7 +63,7 @@ def readhex(path):
         if not line.startswith(':'):
             raise ValueError('Intel hex files should start with a colon')
         line = line[1:]
-        line = bytes.fromhex(line)
+        line = binascii.unhexlify(line)
         line = line[:-1] # drop checksum
         datalen, address, record_type = struct.unpack('>BHB', line[:4])
         data = line[4:]
@@ -109,7 +109,7 @@ def readhex(path):
 def write_line(fout, record_type, data=b'', address=0):
     line = struct.pack('>BHB', len(data), address, record_type)
     line += data
-    checksum = (256 - sum(line)) & 0xff
+    checksum = (256 - sum(map(ord, line))) & 0xff
     line += struct.pack('B', checksum)
     line = ':%s\n' % binascii.hexlify(line).decode('utf-8').upper()
     fout.write(line)
