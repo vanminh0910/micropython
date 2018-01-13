@@ -363,8 +363,8 @@ void handle_irq(void) {
         sd_evt_handler(evt_id);
     }
 
-    uint16_t evt_len = sizeof(m_ble_evt_buf);
     while (1) {
+        uint16_t evt_len = sizeof(m_ble_evt_buf);
         uint32_t err_code = sd_ble_evt_get(m_ble_evt_buf, &evt_len);
 #if DEBUG
         if (err_code != NRF_SUCCESS) {
@@ -373,8 +373,6 @@ void handle_irq(void) {
            } else if (err_code == NRF_ERROR_INVALID_ADDR) {
                LOG("ble event error: invalid addr");
            } else if (err_code == NRF_ERROR_DATA_SIZE) {
-               // TODO: this error is sometimes logged, but is also logged
-               // when m_ble_evt_buf is really big?
                LOG("ble event error: data size");
            } else {
                LOG("ble event error: other");
