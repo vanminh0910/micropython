@@ -179,6 +179,7 @@ void handle_command(uint16_t data_len, ble_command_t *cmd) {
         LOG("command: erase page");
         uint32_t err_code = sd_flash_page_erase(cmd->erase.page);
         if (ERROR_REPORTING && err_code != 0) {
+            LOG("  error: cannot schedule page erase");
             // Error: the erase command wasn't scheduled.
             ble_send_reply(1);
         }
@@ -192,19 +193,16 @@ void handle_command(uint16_t data_len, ble_command_t *cmd) {
     } else if (cmd->any.command == COMMAND_WRITE_BUFFER) {
         LOG("command: do write");
 #if FLASH_PAGE_CHECKS
-        if (cmd->write.page < APP_CODE_BASE / PAGE_SIZE
-            #ifdef DFU_TYPE_mbr
-            || cmd->write.page >= (uint32_t)BOOTLOADER_START_ADDR / PAGE_SIZE
-            #endif
-            ) {
+        if (cmd->write.page < APP_CODE_BASE / PAGE_SIZE || cmd->write.page >= (uint32_t)APP_CODE_END / PAGE_SIZE) {
             if (ERROR_REPORTING) {
+                LOG("  error: page out of range");
                 ble_send_reply(1);
             }
             return;
         }
 #endif
         if (sd_flash_write((uint32_t*)((uintptr_t)cmd->write.page * PAGE_SIZE), (uint32_t*)flash_buf, cmd->write.n_words) != 0) {
-            LOG("could not start page write");
+            LOG("  error: could not start page write");
             if (ERROR_REPORTING) {
                 ble_send_reply(1);
             }

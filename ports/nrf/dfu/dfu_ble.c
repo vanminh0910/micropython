@@ -136,7 +136,7 @@ static MBRCONST struct {
     {'N', '5', '2', 'a'},
 #endif
     APP_CODE_BASE / PAGE_SIZE,
-    (APP_BOOTLOADER_BASE / PAGE_SIZE) - (APP_CODE_BASE / PAGE_SIZE),
+    (APP_CODE_END / PAGE_SIZE) - (APP_CODE_BASE / PAGE_SIZE),
 };
 
 static ble_uuid_t uuid;

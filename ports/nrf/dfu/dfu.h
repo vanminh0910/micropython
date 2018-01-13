@@ -79,7 +79,7 @@ extern const uint32_t _stext[];
 #error Unknown chip
 #endif
 
-#define APP_BOOTLOADER_BASE    (FLASH_SIZE - APP_BOOTLOADER_SIZE)
+#define APP_CODE_END           (FLASH_SIZE - APP_BOOTLOADER_SIZE)
 
 #define COMMAND_RESET        (0x01) // do a reset
 #define COMMAND_ERASE_PAGE   (0x02) // start erasing this page
