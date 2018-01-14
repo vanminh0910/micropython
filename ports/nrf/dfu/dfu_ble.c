@@ -45,7 +45,7 @@
 #define BLE_MIN_CONN_INTERVAL        BLE_GAP_CP_MIN_CONN_INTVL_MIN
 #define BLE_MAX_CONN_INTERVAL        BLE_GAP_CP_MAX_CONN_INTVL_MIN
 #define BLE_SLAVE_LATENCY            0
-#define BLE_CONN_SUP_TIMEOUT         BLE_GAP_CP_CONN_SUP_TIMEOUT_MAX
+#define BLE_CONN_SUP_TIMEOUT         MSEC_TO_UNITS(4000, UNIT_10_MS)
 
 // Randomly generated UUID. This UUID is the base UUID, but also the
 // service UUID.
@@ -114,7 +114,7 @@ static MBRCONST ble_gap_adv_params_t m_adv_params = {
     .type        = BLE_GAP_ADV_TYPE_ADV_IND,            // connectable
     .p_peer_addr = NULL,                                // undirected advertisement
     .fp          = BLE_GAP_ADV_FP_ANY,
-    .interval    = MSEC_TO_UNITS(100, UNIT_0_625_MS),   // approx 8 ms
+    .interval    = MSEC_TO_UNITS(100, UNIT_0_625_MS),   // approx 100ms
     .timeout     = 0,                                   // infinite advertisment
 };
 
