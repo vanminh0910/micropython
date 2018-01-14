@@ -44,11 +44,18 @@ void uart_write(char *s) {
 }
 
 void uart_write_num(uint32_t n) {
-    do {
-        char ch = (n % 10) + '0';
+    uart_write_char('0');
+    uart_write_char('x');
+
+    // write hex digits
+    for (int i = 0; i < 8; i++) {
+        char ch = (n >> 28) + '0';
+        if (ch > '9') {
+            ch = (n >> 28) + 'a';
+        }
         uart_write_char(ch);
-        n /= 10;
-    } while (n);
+        n <<= 4;
+    }
 }
 
 #if DEBUG

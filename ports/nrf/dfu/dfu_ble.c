@@ -257,41 +257,35 @@ void ble_init(void) {
         LOG_NUM("cannot enable BLE:", err_code);
     }
 
-    LOG("sd_ble_gap_device_name_set");
     if (sd_ble_gap_device_name_set(&sec_mode,
                                    adv_data.name_value,
                                    sizeof(adv_data.name_value)) != 0) {
-        LOG("cannot apply GAP parameters.");
+        LOG("cannot apply GAP parameters");
     }
 
     // set connection parameters
-    LOG("sd_ble_gap_ppcp_set");
     if (sd_ble_gap_ppcp_set(&gap_conn_params) != 0) {
-        LOG("cannot set PPCP parameters.");
+        LOG("cannot set PPCP parameters");
     }
 
-    LOG("sd_ble_gap_adv_data_set");
     if (sd_ble_gap_adv_data_set((const uint8_t*)&adv_data, sizeof(adv_data), NULL, 0) != 0) {
         LOG("cannot apply advertisment data");
     }
 
-    LOG("sd_ble_gap_adv_start");
     if (sd_ble_gap_adv_start(&m_adv_params) != 0) {
-        LOG("cannot start advertisment.");
+        LOG("cannot start advertisment");
     }
 
-    LOG("add uuid");
     uuid.uuid = UUID_DFU_SERVICE;
     if (sd_ble_uuid_vs_add(&uuid_base, &uuid.type) != 0) {
-        LOG("cannot add UUID.");
+        LOG("cannot add UUID");
     }
 
-    LOG("add service");
     uint16_t service_handle;
     if (sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
                                  &uuid,
                                  &service_handle) != 0) {
-        LOG("cannot add Service.");
+        LOG("cannot add service");
     }
 
     // Add 'info' characteristic
@@ -301,7 +295,7 @@ void ble_init(void) {
                                         &char_md_readonly,
                                         &attr_char_info,
                                         &handles) != 0) {
-        LOG("Can not add Characteristic.");
+        LOG("cannot add info char");
     }
 
     // Add 'command' characteristic
@@ -310,7 +304,7 @@ void ble_init(void) {
                                         &char_md_write_notify,
                                         &attr_char_write,
                                         &char_command_handles) != 0) {
-        LOG("Can not add Characteristic.");
+        LOG("cannot add cmd char");
     }
 
 #if PACKET_CHARACTERISTIC
@@ -320,7 +314,7 @@ void ble_init(void) {
                                         &char_md_write_wo_resp,
                                         &attr_char_write,
                                         &char_buffer_handles) != 0) {
-        LOG("Can not add Characteristic.");
+        LOG("cannot add buf char");
     }
 #endif
 }
