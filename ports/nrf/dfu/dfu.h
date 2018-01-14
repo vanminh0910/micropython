@@ -33,8 +33,10 @@
 #define DEBUG 0
 #if DEBUG
 #define LOG(s) uart_write(s "\r\n")
+#define LOG_NUM(s, n) uart_write(s " "); uart_write_num(n); uart_write("\r\n")
 #else
 #define LOG(s)
+#define LOG_NUM(s, n)
 #endif
 
 #define INPUT_CHECKS           (1) // whether the received buffer is the correct length
@@ -103,12 +105,14 @@ typedef union {
         uint8_t  flags; // or rather: padding
         uint16_t page;
     } erase; // COMMAND_ERASE_PAGE
+#if !PACKET_CHARACTERISTIC
     struct {
         uint8_t  command;
         uint8_t  flags; // or rather: padding
         uint16_t padding;
         uint8_t  buffer[16];
     } buffer; // COMMAND_ADD_BUFFER
+#endif
     struct {
         uint8_t  command;
         uint8_t  flags; // or rather: padding

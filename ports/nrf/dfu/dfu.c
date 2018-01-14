@@ -175,7 +175,7 @@ void handle_command(uint16_t data_len, ble_command_t *cmd) {
         LOG("command: reset");
         sd_nvic_SystemReset();
     } else if (cmd->any.command == COMMAND_ERASE_PAGE) {
-        if (INPUT_CHECKS && data_len < 4) return;
+        if (INPUT_CHECKS && data_len < sizeof(cmd->erase)) return;
         LOG("command: erase page");
         uint32_t err_code = sd_flash_page_erase(cmd->erase.page);
         if (ERROR_REPORTING && err_code != 0) {
@@ -192,6 +192,8 @@ void handle_command(uint16_t data_len, ble_command_t *cmd) {
         }
     } else if (cmd->any.command == COMMAND_WRITE_BUFFER) {
         LOG("command: do write");
+        if (INPUT_CHECKS && data_len < sizeof(cmd->write)) return;
+        if (INPUT_CHECKS && cmd->write.n_words > PAGE_SIZE / 4) return;
 #if FLASH_PAGE_CHECKS
         if (cmd->write.page < APP_CODE_BASE / PAGE_SIZE || cmd->write.page >= (uint32_t)APP_CODE_END / PAGE_SIZE) {
             if (ERROR_REPORTING) {
@@ -263,7 +265,7 @@ void sd_evt_handler(uint32_t evt_id) {
             }
             break;
         default:
-            LOG("sd evt: unknown SD evt");
+            LOG_NUM("sd evt:", evt_id);
             break;
     }
 }

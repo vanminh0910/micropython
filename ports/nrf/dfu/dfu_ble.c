@@ -254,50 +254,36 @@ void ble_init(void) {
     uint32_t err_code = sd_ble_enable(&ble_enable_params, &app_ram_base);
     #endif
     if (err_code != 0) {
-        if (err_code == NRF_ERROR_INVALID_STATE) {
-            LOG("Cannot enable BLE: invalid state");
-        } else if (err_code == NRF_ERROR_INVALID_ADDR) {
-            LOG("Cannot enable BLE: invalid address");
-        } else if (err_code == NRF_ERROR_INVALID_LENGTH) {
-            LOG("Cannot enable BLE: invalid length");
-        } else if (err_code == NRF_ERROR_INVALID_PARAM) {
-            LOG("Cannot enable BLE: invalid param");
-        } else if (err_code == NRF_ERROR_NOT_SUPPORTED) {
-            LOG("Cannot enable BLE: not supported");
-        } else if (err_code == NRF_ERROR_NO_MEM) {
-            LOG("Cannot enable BLE: no mem");
-        } else {
-            LOG("Cannot enable BLE: ?");
-        }
+        LOG_NUM("cannot enable BLE:", err_code);
     }
 
     LOG("sd_ble_gap_device_name_set");
     if (sd_ble_gap_device_name_set(&sec_mode,
                                    adv_data.name_value,
                                    sizeof(adv_data.name_value)) != 0) {
-        LOG("Cannot apply GAP parameters.");
+        LOG("cannot apply GAP parameters.");
     }
 
     // set connection parameters
     LOG("sd_ble_gap_ppcp_set");
     if (sd_ble_gap_ppcp_set(&gap_conn_params) != 0) {
-        LOG("Cannot set PPCP parameters.");
+        LOG("cannot set PPCP parameters.");
     }
 
     LOG("sd_ble_gap_adv_data_set");
     if (sd_ble_gap_adv_data_set((const uint8_t*)&adv_data, sizeof(adv_data), NULL, 0) != 0) {
-        LOG("Can not apply advertisment data");
+        LOG("cannot apply advertisment data");
     }
 
     LOG("sd_ble_gap_adv_start");
     if (sd_ble_gap_adv_start(&m_adv_params) != 0) {
-        LOG("Can not start advertisment.");
+        LOG("cannot start advertisment.");
     }
 
     LOG("add uuid");
     uuid.uuid = UUID_DFU_SERVICE;
     if (sd_ble_uuid_vs_add(&uuid_base, &uuid.type) != 0) {
-        LOG("Can not add UUID.");
+        LOG("cannot add UUID.");
     }
 
     LOG("add service");
@@ -305,7 +291,7 @@ void ble_init(void) {
     if (sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
                                  &uuid,
                                  &service_handle) != 0) {
-        LOG("Can not add Service.");
+        LOG("cannot add Service.");
     }
 
     // Add 'info' characteristic

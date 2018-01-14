@@ -43,6 +43,14 @@ void uart_write(char *s) {
     }
 }
 
+void uart_write_num(uint32_t n) {
+    do {
+        char ch = (n % 10) + '0';
+        uart_write_char(ch);
+        n /= 10;
+    } while (n);
+}
+
 #if DEBUG
 void uart_enable() {
     // TODO: set correct GPIO configuration? Only necessary when system
