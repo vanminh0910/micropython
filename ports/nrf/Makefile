@@ -42,7 +42,7 @@ ifeq ($(SD),s110)
 BOOTLOADERLD = dfu/nrf51x22_256k_16k_s110_8.0.0_$(DFU).ld
 PAGESIZE = 1024
 else ifeq ($(SD),s132)
-BOOTLOADERLD = dfu/nrf52_s132_3.0.0_$(DFU).ld
+BOOTLOADERLD = dfu/nrf52_512k_s132_3.0.0_$(DFU).ld
 PAGESIZE = 4096
 endif
 endif

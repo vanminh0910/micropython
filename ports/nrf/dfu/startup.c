@@ -74,7 +74,7 @@ void Reset_Handler(void) {
     ram_on_b_addr = 1 << 17;
 #endif
 
-#if defined(DFU_TYPE_mbr)
+#if defined(DFU_TYPE_mbr) || !defined(NRF51)
     // Initialize .data segment. By avoiding non-zero non-const values, we
     // can also avoid this startup code. Saves 36 bytes.
     uint32_t * p_src  = &_sidata;

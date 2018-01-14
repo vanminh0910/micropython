@@ -90,7 +90,7 @@ extern const uint32_t _stext[];
 #define COMMAND_PING         (0x10) // just ask a response (debug)
 #define COMMAND_START        (0x11) // start the app (debug, unreliable)
 
-#if defined(DFU_TYPE_mbr)
+#if defined(DFU_TYPE_mbr) || !defined(NRF51)
 #define MBRCONST
 #else
 #define MBRCONST const
