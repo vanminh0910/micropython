@@ -29,6 +29,7 @@
 #include <stddef.h>
 #include "ble.h"
 #include "nrf_sdm.h"
+#include "nrf_mbr.h"
 #include "dfu.h"
 #include "dfu_ble.h"
 #include "dfu_uart.h"
@@ -129,14 +130,14 @@ static MBRCONST struct {
 } char_info_value = {
     1,
     PAGE_SIZE_LOG2,
-    FLASH_SIZE /  PAGE_SIZE,
+    FLASH_SIZE /  PAGE_SIZE, // will be updated when DYNAMIC_INFO_CHAR is set
 #if NRF51
-    {'N', '5', '1', 'a'},
+    {'N', '5', '1', 'a'}, // nRF51, 'serial number' a (if ever needed)
 #elif NRF52
-    {'N', '5', '2', 'a'},
+    {'N', '5', '2', 'a'}, // nRF52, 'serial number' a (if ever needed)
 #endif
-    APP_CODE_BASE / PAGE_SIZE,
-    (APP_CODE_END / PAGE_SIZE) - (APP_CODE_BASE / PAGE_SIZE),
+    APP_CODE_BASE / PAGE_SIZE, // will be updated when DYNAMIC_INFO_CHAR is set
+    (APP_CODE_END / PAGE_SIZE) - (APP_CODE_BASE / PAGE_SIZE), // same for this one
 };
 
 static ble_uuid_t uuid;
@@ -287,6 +288,13 @@ void ble_init(void) {
                                  &service_handle) != 0) {
         LOG("cannot add service");
     }
+
+    // Load values for 'info' characteristic
+    #if DYNAMIC_INFO_CHAR
+    char_info_value.number_of_pages = NRF_FICR->CODESIZE;
+    char_info_value.app_first_page = SD_SIZE_GET(MBR_SIZE) / PAGE_SIZE;
+    char_info_value.app_number_of_pages = char_info_value.number_of_pages - char_info_value.app_first_page;
+    #endif
 
     // Add 'info' characteristic
     uuid.uuid = UUID_DFU_CHAR_INFO;

@@ -30,7 +30,13 @@
 #include "mpconfigboard.h"
 #include "dfu_uart.h"
 
-#define DEBUG 0
+#define DEBUG                  (0)
+#define INPUT_CHECKS           (1) // whether the received buffer is the correct length
+#define FLASH_PAGE_CHECKS      (1) // check that flash pages are within the app area
+#define ERROR_REPORTING        (1) // send error when something goes wrong (e.g. flash write fail)
+#define PACKET_CHARACTERISTIC  (1) // add a separate transport characteristic - improves speed but costs 32 bytes
+#define DYNAMIC_INFO_CHAR      (1) // load 'info' characteristic from calculated values
+
 #if DEBUG
 #define LOG(s) uart_write(s "\r\n")
 #define LOG_NUM(s, n) uart_write(s " "); uart_write_num(n); uart_write("\r\n")
@@ -38,11 +44,6 @@
 #define LOG(s)
 #define LOG_NUM(s, n)
 #endif
-
-#define INPUT_CHECKS           (1) // whether the received buffer is the correct length
-#define FLASH_PAGE_CHECKS      (1) // check that flash pages are within the app area
-#define ERROR_REPORTING        (1) // send error when something goes wrong (e.g. flash write fail)
-#define PACKET_CHARACTERISTIC  (1) // add a separate transport characteristic - improves speed but costs 32 bytes
 
 extern const uint32_t _stext[];
 
