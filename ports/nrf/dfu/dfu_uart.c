@@ -51,7 +51,7 @@ void uart_write_num(uint32_t n) {
     for (int i = 0; i < 8; i++) {
         char ch = (n >> 28) + '0';
         if (ch > '9') {
-            ch = (n >> 28) + 'a';
+            ch = (n >> 28) + 'a' - 10;
         }
         uart_write_char(ch);
         n <<= 4;
