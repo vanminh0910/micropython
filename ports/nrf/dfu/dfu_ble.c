@@ -289,7 +289,9 @@ void ble_init(void) {
         LOG("cannot add service");
     }
 
-    // Load values for 'info' characteristic
+    // Load values for 'info' characteristic.
+    // If this fails (nRF51 in bootloader mode), disable
+    // DYNAMIC_INFO_CHAR.
     #if DYNAMIC_INFO_CHAR
     char_info_value.number_of_pages = NRF_FICR->CODESIZE;
     char_info_value.app_first_page = SD_SIZE_GET(MBR_SIZE) / PAGE_SIZE;

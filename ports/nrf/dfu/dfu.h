@@ -51,12 +51,6 @@ extern const uint32_t _stext[];
 #define SD_CODE_BASE           (0x00001000)
 #define MBR_VECTOR_TABLE       (0x20000000)
 
-#if defined(DFU_TYPE_mbr)
-#define APP_BOOTLOADER_SIZE    (0)
-#else
-#define APP_BOOTLOADER_SIZE    (0x5000) // TODO: this is incorrect
-#endif
-
 #if NRF51
 #define APP_CODE_BASE          (0x00018000)
 #define APP_RAM_BASE           (0x20002000)
@@ -80,6 +74,12 @@ extern const uint32_t _stext[];
 
 #else
 #error Unknown chip
+#endif
+
+#if defined(DFU_TYPE_mbr)
+#define APP_BOOTLOADER_SIZE    (0)
+#else
+#define APP_BOOTLOADER_SIZE    (PAGE_SIZE)
 #endif
 
 #define APP_CODE_END           (FLASH_SIZE - APP_BOOTLOADER_SIZE)
