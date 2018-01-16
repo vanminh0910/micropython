@@ -27,7 +27,9 @@
 
 #include "device/nrf.h"
 #include "dfu.h"
-#include "mpconfigboard.h"
+#include "py/mpconfig.h"
+#include "modules/machine/pin.h"
+#include "genhdr/pins.h"
 #include "dfu_uart.h"
 
 
@@ -65,13 +67,7 @@ void uart_enable() {
     NRF_UART0->ENABLE        = UART_ENABLE_ENABLE_Enabled;
     NRF_UART0->BAUDRATE      = UART_BAUDRATE_BAUDRATE_Baud115200;
     NRF_UART0->TASKS_STARTTX = 1;
-    #if defined(WT51822_S4AT)
-    NRF_UART0->PSELTXD       = 2; // P0.02
-    #elif defined(PCA10040)
-    NRF_UART0->PSELTXD       = 6; // P0.06
-    #else
-    #error Setup TX pin for debugging
-    #endif
+    NRF_UART0->PSELTXD       = MICROPY_HW_UART1_TX.pin;
 }
 #endif
 

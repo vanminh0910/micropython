@@ -235,7 +235,7 @@ DFU_SRC_C := $(addprefix dfu/,\
 	 startup.c \
 	 )
 
-DFU_OBJ := $(addprefix $(BUILD)/, $(DFU_SRC_C:.c=.o))
+DFU_OBJ := $(addprefix $(BUILD)/, $(DFU_SRC_C:.c=.o)) $(BUILD)/pins_gen.o
 
 # Create build directories and isr-vector.h before compiling DFU_OBJ files.
 $(DFU_OBJ): | $(BUILD)/dfu
