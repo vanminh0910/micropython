@@ -71,6 +71,14 @@ soft_reset:
     mp_stack_set_top((void *)sp);
     mp_stack_set_limit(MP_TASK_STACK_SIZE - 1024);
     gc_init(mp_task_heap, mp_task_heap + sizeof(mp_task_heap));
+    uint8_t *heap2 = NULL;
+    for (size_t heap_size = 520 * 1024; heap_size >= 8 * 1024; heap_size -= 1024) {
+        heap2 = malloc(heap_size);
+        if (heap2 != NULL) {
+            gc_add(heap2, heap2 + heap_size);
+            break;
+        }
+    }
     mp_init();
     mp_obj_list_init(mp_sys_path, 0);
     mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR_));
@@ -110,6 +118,7 @@ soft_reset:
     machine_pins_deinit();
 
     mp_deinit();
+    free(heap2);
     fflush(stdout);
     goto soft_reset;
 }
