@@ -86,20 +86,12 @@ STATIC void machine_hard_i2c_print(const mp_print_t *print, mp_obj_t self_in, mp
 /******************************************************************************/
 /* MicroPython bindings for machine API                                       */
 
-// for make_new
-enum {
-    ARG_NEW_id,
-    ARG_NEW_scl,
-    ARG_NEW_sda,
-    ARG_NEW_freq,
-    ARG_NEW_timeout,
-};
-
 mp_obj_t machine_hard_i2c_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
+    enum { ARG_id, ARG_scl, ARG_sda };
     static const mp_arg_t allowed_args[] = {
-        { ARG_NEW_id,       MP_ARG_REQUIRED | MP_ARG_OBJ },
-        { ARG_NEW_scl,      MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
-        { ARG_NEW_sda,      MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
+        { MP_QSTR_id,       MP_ARG_REQUIRED | MP_ARG_OBJ },
+        { MP_QSTR_scl,      MP_ARG_REQUIRED | MP_ARG_OBJ },
+        { MP_QSTR_sda,      MP_ARG_REQUIRED | MP_ARG_OBJ },
     };
 
     // parse args
@@ -107,24 +99,11 @@ mp_obj_t machine_hard_i2c_make_new(const mp_obj_type_t *type, size_t n_args, siz
     mp_arg_parse_all_kw_array(n_args, n_kw, all_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
     // get static peripheral object
-    int i2c_id = i2c_find(args[ARG_NEW_id].u_obj);
+    int i2c_id = i2c_find(args[ARG_id].u_obj);
     machine_hard_i2c_obj_t *self = &machine_hard_i2c_obj[i2c_id];
 
-    if (args[ARG_NEW_scl].u_obj != MP_OBJ_NULL) {
-        const pin_obj_t * p_scl_obj = args[ARG_NEW_scl].u_obj;
-        self->config.scl = p_scl_obj->pin;
-    } else {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-                  "I2C SCL Pin not set"));
-    }
-
-    if (args[ARG_NEW_sda].u_obj != MP_OBJ_NULL) {
-        const pin_obj_t * p_sda_obj = args[ARG_NEW_sda].u_obj;
-        self->config.sda = p_sda_obj->pin;
-    } else {
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-                  "I2C SDA Pin not set"));
-    }
+    self->config.scl = mp_hal_get_pin_obj(args[ARG_scl].u_obj)->pin;
+    self->config.sda = mp_hal_get_pin_obj(args[ARG_sda].u_obj)->pin;
 
     self->config.frequency = NRF_TWI_FREQ_100K;
 
