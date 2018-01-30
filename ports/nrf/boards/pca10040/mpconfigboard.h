@@ -36,7 +36,7 @@
 #define MICROPY_PY_MACHINE_RTCOUNTER (1)
 #define MICROPY_PY_MACHINE_I2C      (1)
 #define MICROPY_PY_MACHINE_ADC      (0)
-#define MICROPY_PY_MACHINE_TEMP     (0)
+#define MICROPY_PY_MACHINE_TEMP     (1)
 #define MICROPY_PY_HW_RNG           (0)
 
 #define MICROPY_HW_HAS_LED          (1)
