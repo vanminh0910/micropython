@@ -27,6 +27,13 @@
 #ifndef NRFX_CONFIG_H
 #define NRFX_CONFIG_H
 
+// Port specific defines
+#define NRFX_LOG_ENABLED 1
+#define NRFX_LOG_UART_DISABLED 0
+
+
+// NRFX configurations
+
 #define GPIO_COUNT 1
 #define NRFX_UART_ENABLED 1
 #define NRFX_UART0_ENABLED 1

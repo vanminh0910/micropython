@@ -58,6 +58,7 @@ INC += -I../../lib/mp-readline
 INC += -I./drivers/bluetooth
 INC += -I./drivers
 INC += -I../../lib/nrfx/
+INC += -I../../lib/nrfx/drivers
 INC += -I../../lib/nrfx/drivers/include
 INC += -I../../lib/nrfx/mdk
 INC += -I../../lib/nrfx/hal

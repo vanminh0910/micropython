@@ -31,6 +31,7 @@
 #include <nrfx.h>
 #include "pin.h"
 #include "nrf_gpio.h"
+#include "nrfx_config.h"
 
 typedef enum
 {
@@ -56,6 +57,8 @@ void mp_hal_stdout_tx_str(const char *str);
 
 void mp_hal_delay_ms(mp_uint_t ms);
 void mp_hal_delay_us(mp_uint_t us);
+
+const char * nrfx_error_code_lookup(uint32_t err_code);
 
 #define mp_hal_pin_obj_t const pin_obj_t*
 #define mp_hal_get_pin_obj(o)    pin_find(o)

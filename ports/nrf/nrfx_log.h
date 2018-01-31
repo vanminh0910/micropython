@@ -27,14 +27,50 @@
 #ifndef NRFX_LOG_H
 #define NRFX_LOG_H
 
-#define NRFX_LOG_ERROR(format, ...)
-#define NRFX_LOG_WARNING(format, ...)
-#define NRFX_LOG_INFO(format, ...)
-#define NRFX_LOG_DEBUG(format, ...)
-#define NRFX_LOG_HEXDUMP_ERROR(p_memory, length)
-#define NRFX_LOG_HEXDUMP_WARNING(p_memory, length)
-#define NRFX_LOG_HEXDUMP_INFO(p_memory, length)
-#define NRFX_LOG_HEXDUMP_DEBUG(p_memory, length)
-#define NRFX_LOG_ERROR_STRING_GET(error_code)
+#include <stdio.h>
+#include "mphalport.h"
+#include "nrfx_config.h"
+
+#if (!defined(NRFX_LOG_ENABLED) || (NRFX_LOG_ENABLED == 0)) || \
+    (NRFX_LOG_MODULE == UART) && defined(NRFX_LOG_UART_DISABLED) && !NRFX_LOG_UART_DISABLED
+
+    #define NRFX_LOG_DEBUG(fmt, ...)
+    #define NRFX_LOG_ERROR(fmt, ...)
+    #define NRFX_LOG_WARNING(fmt, ...)
+    #define NRFX_LOG_INFO(fmt, ...)
+
+
+    #define NRFX_LOG_HEXDUMP_ERROR(p_memory, length)
+    #define NRFX_LOG_HEXDUMP_WARNING(p_memory, length)
+    #define NRFX_LOG_HEXDUMP_INFO(p_memory, length)
+    #define NRFX_LOG_HEXDUMP_DEBUG(p_memory, length)
+    #define NRFX_LOG_ERROR_STRING_GET(error_code) ""
+#else
+
+    #define NRFX_LOG_DEBUG(fmt, ...) \
+        do { printf(fmt, ##__VA_ARGS__); } while (0)
+
+    #define NRFX_LOG_ERROR(fmt, ...) \
+        do { printf(fmt, ##__VA_ARGS__); } while (0)
+
+    #define NRFX_LOG_WARNING(fmt, ...) \
+        do { printf(fmt, ##__VA_ARGS__); } while (0)
+
+    #define NRFX_LOG_INFO(fmt, ...) \
+        do { printf(fmt, ##__VA_ARGS__); } while (0)
+
+
+    #define NRFX_LOG_HEXDUMP_ERROR(p_memory, length)
+
+    #define NRFX_LOG_HEXDUMP_WARNING(p_memory, length)
+
+    #define NRFX_LOG_HEXDUMP_INFO(p_memory, length)
+
+    #define NRFX_LOG_HEXDUMP_DEBUG(p_memory, length)
+
+    #define NRFX_LOG_ERROR_STRING_GET(error_code) \
+        nrfx_error_code_lookup(error_code)
+
+#endif // NRFX_LOG_ENABLED
 
 #endif // NRFX_LOG_H
