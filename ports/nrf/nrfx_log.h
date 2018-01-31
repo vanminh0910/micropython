@@ -32,7 +32,7 @@
 #include "nrfx_config.h"
 
 #if (!defined(NRFX_LOG_ENABLED) || (NRFX_LOG_ENABLED == 0)) || \
-    (NRFX_LOG_MODULE == UART) && defined(NRFX_LOG_UART_DISABLED) && !NRFX_LOG_UART_DISABLED
+    ((NRFX_LOG_MODULE == UART) && defined(NRFX_LOG_UART_DISABLED) && !NRFX_LOG_UART_DISABLED)
 
     #define NRFX_LOG_DEBUG(fmt, ...)
     #define NRFX_LOG_ERROR(fmt, ...)
