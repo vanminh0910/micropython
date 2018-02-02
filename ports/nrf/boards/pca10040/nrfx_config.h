@@ -28,8 +28,11 @@
 #define NRFX_CONFIG_H
 
 // Port specific defines
-#define NRFX_LOG_ENABLED 1
-#define NRFX_LOG_UART_DISABLED 0
+#ifndef NRFX_LOG_ENABLED
+#define NRFX_LOG_ENABLED 0
+#endif
+
+#define NRFX_LOG_UART_DISABLED 1
 
 
 // NRFX configurations

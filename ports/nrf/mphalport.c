@@ -164,7 +164,7 @@ void mp_hal_delay_ms(mp_uint_t ms)
     }
 }
 
-#if defined(NRF_LOG_ENABLED) && (NRFX_LOG_ENABLED == 1)
+#if defined(NRFX_LOG_ENABLED) && (NRFX_LOG_ENABLED == 1)
 
 static const char nrfx_error_unknown[1] = "";
 
