@@ -33,8 +33,46 @@
 
 #if MICROPY_PY_HW_RNG
 
+static inline uint32_t generate_hw_random(void) {
+    uint32_t retval = 0;
+    uint8_t * p_retval = (uint8_t *)&retval;
+
+    nrf_rng_event_clear(NRF_RNG_EVENT_VALRDY);
+    nrf_rng_task_trigger(NRF_RNG_TASK_START);
+
+    for (uint16_t i = 0; i < 4; i++) {
+        while (!nrf_rng_event_get(NRF_RNG_EVENT_VALRDY)) {
+            ;
+        }
+
+        nrf_rng_event_clear(NRF_RNG_EVENT_VALRDY);
+        p_retval[i] = nrf_rng_random_value_get();
+    }
+
+    nrf_rng_task_trigger(NRF_RNG_TASK_STOP);
+
+    return retval;
+}
+
+static inline uint32_t generate_random_word(void) {
+
+#if BLUETOOTH_SD
+    if (BLUETOOTH_STACK_ENABLED() == 1) {
+        uint32_t retval = 0;
+        uint32_t status;
+        do {
+            status = sd_rand_application_vector_get((uint8_t *)&retval, 4); // Extract 4 bytes
+        } while (status != 0);
+
+	return retval;
+    }
+#endif
+
+    return generate_hw_random();
+}
+
 static inline int rand30() {
-    uint32_t val = hal_rng_generate();
+    uint32_t val = generate_random_word();
     return (val & 0x3fffffff); // binary mask b00111111111111111111111111111111
 }
 
