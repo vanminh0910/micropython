@@ -27,9 +27,25 @@
 #ifndef NRFX_GLUE_H
 #define NRFX_GLUE_H
 
+#include <soc/nrfx_irqs.h>
+
 #define NRFX_ASSERT(expression)
-#define NRFX_IRQ_ENABLE(irq_number)
-#define NRFX_IRQ_DISABLE(irq_number)
-#define NRFX_IRQ_PRIORITY_SET(irq_number, priority)
+
+#if BLUETOOTH_SD
+
+// TODO
+
+#else // BLUETOOTH_SD
+
+#define NRFX_IRQ_ENABLE(irq_number) NVIC_EnableIRQ(irq_number)
+#define NRFX_IRQ_DISABLE(irq_number) NVIC_DisableIRQ(irq_number)
+#define NRFX_IRQ_PRIORITY_SET(irq_number, priority) NVIC_SetPriority(irq_number, priority)
+
+// Source:
+// https://devzone.nordicsemi.com/f/nordic-q-a/8572/disable-interrupts-and-enable-interrupts-if-they-where-enabled/31347#31347
+#define NRFX_CRITICAL_SECTION_ENTER() { int _old_primask = __get_PRIMASK(); __disable_irq();
+#define NRFX_CRITICAL_SECTION_EXIT() __set_PRIMASK(_old_primask); }
+
+#endif // !BLUETOOTH_SD
 
 #endif // NRFX_GLUE_H
