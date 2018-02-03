@@ -145,6 +145,7 @@ SRC_NRFX += $(addprefix lib/nrfx/drivers/src/,\
 	nrfx_twi.c \
 	nrfx_spi.c \
 	nrfx_rtc.c \
+	nrfx_timer.c \
 	)
 
 SRC_C += \
