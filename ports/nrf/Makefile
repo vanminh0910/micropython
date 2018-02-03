@@ -43,8 +43,6 @@ MPY_TOOL = ../../tools/mpy-tool.py
 
 CROSS_COMPILE = arm-none-eabi-
 
-MCU_VARIANT_UPPER = $(shell echo $(MCU_VARIANT) | tr '[:lower:]' '[:upper:]')
-
 INC += -I.
 INC += -I../..
 INC += -I$(BUILD)
@@ -63,8 +61,11 @@ INC += -I../../lib/nrfx/drivers/include
 INC += -I../../lib/nrfx/mdk
 INC += -I../../lib/nrfx/hal
 
+MCU_VARIANT_UPPER = $(shell echo $(MCU_VARIANT) | tr '[:lower:]' '[:upper:]')
+MCU_SUB_VARIANT_UPPER = $(shell echo $(MCU_SUB_VARIANT) | tr '[:lower:]' '[:upper:]')
 
 NRF_DEFINES += -D$(MCU_VARIANT_UPPER)
+NRF_DEFINES += -D$(MCU_SUB_VARIANT_UPPER)
 NRF_DEFINES += -DCONFIG_GPIO_AS_PINRESET
 
 CFLAGS_CORTEX_M = -mthumb -mabi=aapcs -fsingle-precision-constant -Wdouble-promotion
