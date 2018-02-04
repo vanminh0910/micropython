@@ -4,6 +4,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2016 Glenn Ruben Bakke
+ * Copyright (c) 2018 Ayke van Laethem
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,92 +25,87 @@
  * THE SOFTWARE.
  */
 
-#include <stdio.h>
-#include <string.h>
-
 #include "py/nlr.h"
 #include "py/runtime.h"
-#include "py/mphal.h"
 #include "rtcounter.h"
 #include "nrfx_rtc.h"
+#include "nrf_clock.h"
 
 #if MICROPY_PY_MACHINE_RTCOUNTER
 
-#define LFCLK_FREQ (32768UL)
-#define RTC_FREQ (10UL)
-#define RTC_COUNTER_PRESCALER ((LFCLK_FREQ/RTC_FREQ)-1)
+// Count every 125ms (~maximum prescaler setting)
+#define RTC_FREQUENCY (8UL)
 
-#define RTC_TYPE_ONESHOT  (0)
-#define RTC_TYPE_PERIODIC (1)
+enum {
+    RTC_MODE_ONESHOT,
+    RTC_MODE_PERIODIC,
+};
 
+// Volatile part of the RTCounter object.
+typedef struct {
+    mp_obj_t callback;
+    uint32_t period;
+} machine_rtc_config_t;
+
+// Non-volatile part of the RTCounter object.
 typedef struct _machine_rtc_obj_t {
-    mp_obj_base_t      base;
-    uint8_t            id;     // RTC (Real-Time Counter) instance id
-    nrfx_rtc_t *       p_rtc;  // Driver instance
-    nrfx_rtc_config_t  config; // RTC configuration
-    nrfx_rtc_handler_t rtc_interrupt_cb;
-    mp_obj_t           callback;
-    mp_int_t           period;
-    mp_int_t           mode;
+    mp_obj_base_t          base;
+    const nrfx_rtc_t     * p_rtc;   // Driver instance
+    nrfx_rtc_handler_t     handler; // interrupt callback
+    machine_rtc_config_t * config;  // pointer to volatile part
 } machine_rtc_obj_t;
 
-static nrfx_rtc_t instance0 = NRFX_RTC_INSTANCE(0);
-static nrfx_rtc_t instance1 = NRFX_RTC_INSTANCE(1);
+STATIC const nrfx_rtc_t machine_rtc_instances[] = {
+    NRFX_RTC_INSTANCE(0),
+    NRFX_RTC_INSTANCE(1),
 #if NRF52
-static nrfx_rtc_t instance2 = NRFX_RTC_INSTANCE(2);
-#endif
-
-// Forward declare interrupt handlers for the instances
-STATIC void rtc_interrupt_handle0(uint8_t instance);
-STATIC void rtc_interrupt_handle1(uint8_t instance);
-STATIC void rtc_interrupt_handle2(uint8_t instance);
-
-STATIC machine_rtc_obj_t machine_rtc_obj[] = {
-    {{&machine_rtcounter_type}, .p_rtc = &instance0, .rtc_interrupt_cb = rtc_interrupt_handle0},
-    {{&machine_rtcounter_type}, .p_rtc = &instance1, .rtc_interrupt_cb = rtc_interrupt_handle1},
-#if NRF52
-    {{&machine_rtcounter_type}, .p_rtc = &instance2, .rtc_interrupt_cb = rtc_interrupt_handle2},
+    NRFX_RTC_INSTANCE(2),
 #endif
 };
 
-STATIC void rtc_interrupt_handle0(uint8_t instance) {
-    machine_rtc_obj_t * self = &machine_rtc_obj[0];
+STATIC machine_rtc_config_t configs[MP_ARRAY_SIZE(machine_rtc_instances)];
 
-    mp_call_function_1(self->callback, self);
+STATIC void interrupt_handler0(nrfx_rtc_int_type_t int_type);
+STATIC void interrupt_handler1(nrfx_rtc_int_type_t int_type);
+#if NRF52
+STATIC void interrupt_handler2(nrfx_rtc_int_type_t int_type);
+#endif
 
-    if (self != NULL) {
-        nrfx_rtc_disable(self->p_rtc);
-        if (self->mode == 1) {
-            nrfx_rtc_enable(self->p_rtc);
-        }
+STATIC const machine_rtc_obj_t machine_rtc_obj[] = {
+    {{&machine_rtcounter_type}, .p_rtc = &machine_rtc_instances[0], .handler=interrupt_handler0, .config=&configs[0]},
+    {{&machine_rtcounter_type}, .p_rtc = &machine_rtc_instances[1], .handler=interrupt_handler1, .config=&configs[1]},
+#if NRF52
+    {{&machine_rtcounter_type}, .p_rtc = &machine_rtc_instances[2], .handler=interrupt_handler2, .config=&configs[2]},
+#endif
+};
+
+STATIC void interrupt_handler(size_t instance_id) {
+    const machine_rtc_obj_t * self = &machine_rtc_obj[instance_id];
+    machine_rtc_config_t *config = self->config;
+    if (config->callback != NULL) {
+        mp_call_function_1((mp_obj_t)config->callback, (mp_obj_t)self);
+    }
+    if (config->period == 0) {
+        nrfx_rtc_cc_disable(self->p_rtc, 0);
+    } else { // periodic
+        uint32_t val = nrfx_rtc_counter_get(self->p_rtc) + config->period;
+        nrfx_rtc_cc_set(self->p_rtc, 0, val, true);
     }
 }
 
-STATIC void rtc_interrupt_handle1(uint8_t instance) {
-    machine_rtc_obj_t * self = &machine_rtc_obj[1];
-
-    mp_call_function_1(self->callback, self);
-
-    if (self != NULL) {
-        nrfx_rtc_disable(self->p_rtc);
-        if (self->mode == 1) {
-            nrfx_rtc_enable(self->p_rtc);
-        }
-    }
+STATIC void interrupt_handler0(nrfx_rtc_int_type_t int_type) {
+    interrupt_handler(0);
 }
 
-STATIC void rtc_interrupt_handle2(uint8_t instance) {
-    machine_rtc_obj_t * self = &machine_rtc_obj[2];
-
-    mp_call_function_1(self->callback, self);
-
-    if (self != NULL) {
-        nrfx_rtc_disable(self->p_rtc);
-        if (self->mode == 1) {
-            nrfx_rtc_enable(self->p_rtc);
-        }
-    }
+STATIC void interrupt_handler1(nrfx_rtc_int_type_t int_type) {
+    interrupt_handler(1);
 }
+
+#if NRF52
+STATIC void interrupt_handler2(nrfx_rtc_int_type_t int_type) {
+    interrupt_handler(2);
+}
+#endif
 
 void rtc_init0(void) {
 }
@@ -117,8 +113,7 @@ void rtc_init0(void) {
 STATIC int rtc_find(mp_obj_t id) {
     // given an integer id
     int rtc_id = mp_obj_get_int(id);
-    if (rtc_id >= 0 && rtc_id <= MP_ARRAY_SIZE(machine_rtc_obj)
-        && machine_rtc_obj[rtc_id].p_rtc != NULL) {
+    if (rtc_id >= 0 && rtc_id <= MP_ARRAY_SIZE(machine_rtc_obj)) {
         return rtc_id;
     }
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
@@ -127,18 +122,29 @@ STATIC int rtc_find(mp_obj_t id) {
 
 STATIC void rtc_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     machine_rtc_obj_t *self = self_in;
-    mp_printf(print, "RTCounter(%u)", self->id);
+    mp_printf(print, "RTCounter(%u)", self->p_rtc->instance_id);
 }
 
 /******************************************************************************/
 /* MicroPython bindings for machine API                                       */
 
+const nrfx_rtc_config_t machine_rtc_config = {
+    .prescaler    = RTC_FREQ_TO_PRESCALER(RTC_FREQUENCY),
+    .reliable     = 0,
+    .tick_latency = 0, // ignored when reliable == 0
+    #ifdef NRF51
+    .interrupt_priority = 3,
+    #else
+    .interrupt_priority = 6,
+    #endif
+};
+
 STATIC mp_obj_t machine_rtc_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
     enum { ARG_id, ARG_period, ARG_mode, ARG_callback };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_id,       MP_ARG_OBJ, {.u_obj = MP_OBJ_NEW_SMALL_INT(-1)} },
-        { MP_QSTR_period,   MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 1000} },
-        { MP_QSTR_mode,     MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = RTC_TYPE_PERIODIC} },
+        { MP_QSTR_period,   MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = RTC_FREQUENCY} }, // 1 second
+        { MP_QSTR_mode,     MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = RTC_MODE_PERIODIC} },
         { MP_QSTR_callback, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
     };
 
@@ -146,41 +152,46 @@ STATIC mp_obj_t machine_rtc_make_new(const mp_obj_type_t *type, size_t n_args, s
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, all_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
-    // get static peripheral object
     int rtc_id = rtc_find(args[ARG_id].u_obj);
 
-    // unconst machine object in order to set a callback.
-    machine_rtc_obj_t * self = (machine_rtc_obj_t *)&machine_rtc_obj[rtc_id];
+    // const and non-const part of the RTC object.
+    const machine_rtc_obj_t * self = &machine_rtc_obj[rtc_id];
+    machine_rtc_config_t *config = self->config;
 
-    nrfx_rtc_config_t * config = &self->config;
-
-    config->prescaler    = RTC_COUNTER_PRESCALER;
-    config->reliable     = 0;
-    config->tick_latency = NRFX_RTC_US_TO_TICKS(7000, 32768UL);
-
-#ifdef NRF51
-    config->interrupt_priority = 3;
-#else
-    config->interrupt_priority = 6;
-#endif
-
-    // Periodic or one-shot
-    self->mode = args[ARG_mode].u_int;
-
-    // Period between the intervals
-    self->period = args[ARG_period].u_int;
-
-    if (args[ARG_callback].u_obj != mp_const_none) {
-        self->callback = args[ARG_callback].u_obj;
+    if (args[ARG_callback].u_obj == mp_const_none) {
+        config->callback = NULL;
+    } else if (MP_OBJ_IS_FUN(args[ARG_callback].u_obj)) {
+        config->callback = args[ARG_callback].u_obj;
+    } else {
+        mp_raise_ValueError("callback must be a function");
     }
 
-    nrfx_rtc_init(self->p_rtc, config, self->rtc_interrupt_cb);
-    nrfx_rtc_cc_set(self->p_rtc, 0 /*channel*/, self->period, true /*enable irq*/);
+    // Periodic or one-shot
+    if (args[ARG_mode].u_int == RTC_MODE_ONESHOT) {
+        // One-shot
+        config->period = 0;
+    } else {
+        // Period between the intervals
+        config->period = args[ARG_period].u_int;
+    }
+
+    // Start the low-frequency clock (if it hasn't been started already)
+    if (!nrf_clock_lf_is_running()) {
+        nrf_clock_task_trigger(NRF_CLOCK_TASK_LFCLKSTART);
+    }
+
+    // Make sure it's uninitialized.
+    nrfx_rtc_uninit(self->p_rtc);
+    nrfx_rtc_counter_clear(self->p_rtc);
+
+    // Initialize and set the correct IRQ.
+    nrfx_rtc_init(self->p_rtc, &machine_rtc_config, self->handler);
+    nrfx_rtc_cc_set(self->p_rtc, 0 /*channel*/, args[ARG_period].u_int, true /*enable irq*/);
 
     return MP_OBJ_FROM_PTR(self);
 }
 
-/// \method start(period)
+/// \method start()
 /// Start the RTCounter. Timeout occurs after number of periods
 /// in the configured frequency has been reached.
 ///
@@ -205,14 +216,42 @@ STATIC mp_obj_t machine_rtc_stop(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(machine_rtc_stop_obj, machine_rtc_stop);
 
+/// \method counter()
+/// Return the current counter value. Wraps around after about 24 days
+/// with the current prescaler (2^24 / 8 = 2097152 seconds).
+///
+STATIC mp_obj_t machine_rtc_counter(mp_obj_t self_in) {
+    machine_rtc_obj_t * self = MP_OBJ_TO_PTR(self_in);
+
+    uint32_t counter = nrfx_rtc_counter_get(self->p_rtc);
+
+    return MP_OBJ_NEW_SMALL_INT(counter);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(machine_rtc_counter_obj, machine_rtc_counter);
+
+/// \method deinit()
+/// Free resources associated with this RTC.
+///
+STATIC mp_obj_t machine_rtc_deinit(mp_obj_t self_in) {
+    machine_rtc_obj_t * self = MP_OBJ_TO_PTR(self_in);
+
+    nrfx_rtc_uninit(self->p_rtc);
+
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(machine_rtc_deinit_obj, machine_rtc_deinit);
+
 
 STATIC const mp_rom_map_elem_t machine_rtc_locals_dict_table[] = {
-    { MP_ROM_QSTR(MP_QSTR_start), MP_ROM_PTR(&machine_rtc_start_obj) },
-    { MP_ROM_QSTR(MP_QSTR_stop),  MP_ROM_PTR(&machine_rtc_stop_obj) },
+    { MP_ROM_QSTR(MP_QSTR_start),     MP_ROM_PTR(&machine_rtc_start_obj) },
+    { MP_ROM_QSTR(MP_QSTR_stop),      MP_ROM_PTR(&machine_rtc_stop_obj) },
+    { MP_ROM_QSTR(MP_QSTR_counter),   MP_ROM_PTR(&machine_rtc_counter_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit),    MP_ROM_PTR(&machine_rtc_deinit_obj) },
 
     // constants
-    { MP_ROM_QSTR(MP_QSTR_ONESHOT),  MP_ROM_INT(RTC_TYPE_ONESHOT) },
-    { MP_ROM_QSTR(MP_QSTR_PERIODIC), MP_ROM_INT(RTC_TYPE_PERIODIC) },
+    { MP_ROM_QSTR(MP_QSTR_ONESHOT),   MP_ROM_INT(RTC_MODE_ONESHOT) },
+    { MP_ROM_QSTR(MP_QSTR_PERIODIC),  MP_ROM_INT(RTC_MODE_PERIODIC) },
+    { MP_ROM_QSTR(MP_QSTR_FREQUENCY), MP_ROM_INT(RTC_FREQUENCY) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(machine_rtc_locals_dict, machine_rtc_locals_dict_table);
