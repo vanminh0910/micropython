@@ -135,6 +135,7 @@ STATIC void machine_hard_uart_print(const mp_print_t *print, mp_obj_t self_in, m
 ///   - `timeout_char` is the timeout in milliseconds to wait between characters.
 ///   - `read_buf_len` is the character length of the read buffer (0 to disable).
 STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
+    enum { ARG_id, ARG_baudrate, ARG_bits, ARG_parity, ARG_stop, ARG_flow, ARG_timeout, ARG_timeout_char, ARG_read_buf_len };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_id,       MP_ARG_REQUIRED | MP_ARG_OBJ },
         { MP_QSTR_baudrate, MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 9600} },
@@ -152,13 +153,13 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
     mp_arg_parse_all_kw_array(n_args, n_kw, all_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
     // get static peripheral object
-    int uart_id = uart_find(args[0].u_obj);
+    int uart_id = uart_find(args[ARG_id].u_obj);
     const machine_hard_uart_obj_t * self = &machine_hard_uart_obj[uart_id];
 
     nrfx_uart_config_t config;
 
     // flow control
-    config.hwfc = args[5].u_int;
+    config.hwfc = args[ARG_flow].u_int;
 
 #if MICROPY_HW_UART1_HWFC
     config.hwfc = NRF_UART_HWFC_ENABLED;
@@ -174,7 +175,7 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
     config.interrupt_priority = 6;
 #endif
 
-    switch (args[1].u_int) {
+    switch (args[ARG_baudrate].u_int) {
         case 1200:
             config.baudrate = NRF_UART_BAUDRATE_1200;
             break;
@@ -219,7 +220,7 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
             break;
         default:
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-                      "UART baudrate not supported, %u", args[1].u_int));
+                      "UART baudrate not supported, %u", args[ARG_baudrate].u_int));
             break;
     }
 
