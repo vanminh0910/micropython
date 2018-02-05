@@ -69,7 +69,7 @@ void uart_init0(void) {
 STATIC int uart_find(mp_obj_t id) {
     // given an integer id
     int uart_id = mp_obj_get_int(id);
-    if (uart_id >= 0 && uart_id <= MP_ARRAY_SIZE(machine_hard_uart_obj)) {
+    if (uart_id >= 0 && uart_id < MP_ARRAY_SIZE(machine_hard_uart_obj)) {
         return uart_id;
     }
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
