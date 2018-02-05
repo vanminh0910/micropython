@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2013, 2014 Damien P. George
  * Copyright (c) 2015 Glenn Ruben Bakke
+ * Copyright (c) 2018 Ayke van Laethem
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -45,19 +46,17 @@
 
 
 typedef struct _machine_hard_uart_obj_t {
-    mp_obj_base_t      base;
-    uint8_t            id;          // UART instance id
-    nrfx_uart_t *      p_uart;      // Driver instance
-    nrfx_uart_config_t config;      // UART configuration
-    byte               char_width;  // 0 for 7,8 bit chars, 1 for 9 bit chars
+    mp_obj_base_t       base;
+    const nrfx_uart_t * p_uart;      // Driver instance
+    byte                char_width;  // 0 for 7,8 bit chars, 1 for 9 bit chars
 } machine_hard_uart_obj_t;
 
-static nrfx_uart_t instance0 = NRFX_UART_INSTANCE(0);
+static const nrfx_uart_t instance0 = NRFX_UART_INSTANCE(0);
 #if NRF52840_XXAA
-static nrfx_uart_t instance1 = NRFX_UART_INSTANCE(1);
+static const nrfx_uart_t instance1 = NRFX_UART_INSTANCE(1);
 #endif
 
-STATIC machine_hard_uart_obj_t machine_hard_uart_obj[] = {
+STATIC const machine_hard_uart_obj_t machine_hard_uart_obj[] = {
     {{&machine_hard_uart_type}, .p_uart = &instance0},
 #if NRF52840_XXAA
     {{&machine_hard_uart_type}, .p_uart = &instance1},
@@ -65,20 +64,12 @@ STATIC machine_hard_uart_obj_t machine_hard_uart_obj[] = {
 };
 
 void uart_init0(void) {
-    // reset the UART handles
-    memset(&machine_hard_uart_obj[0].config, 0, sizeof(nrfx_uart_config_t));
-    machine_hard_uart_obj[0].id = 0;
-#if NRF52840_XXAA
-    memset(&machine_hard_uart_obj[1].config, 0, sizeof(nrfx_uart_config_t));
-    machine_hard_uart_obj[1].id = 1;
-#endif
 }
 
 STATIC int uart_find(mp_obj_t id) {
     // given an integer id
     int uart_id = mp_obj_get_int(id);
-    if (uart_id >= 0 && uart_id <= MP_ARRAY_SIZE(machine_hard_uart_obj)
-        && machine_hard_uart_obj[uart_id].p_uart != NULL) {
+    if (uart_id >= 0 && uart_id <= MP_ARRAY_SIZE(machine_hard_uart_obj)) {
         return uart_id;
     }
     nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
@@ -89,18 +80,18 @@ void uart_irq_handler(mp_uint_t uart_id) {
 
 }
 
-bool uart_rx_any(machine_hard_uart_obj_t *uart_obj) {
+bool uart_rx_any(const machine_hard_uart_obj_t *uart_obj) {
     // TODO: uart will block for now.
     return true;
 }
 
-int uart_rx_char(machine_hard_uart_obj_t * self) {
+int uart_rx_char(const machine_hard_uart_obj_t * self) {
     uint8_t ch;
     nrfx_uart_rx(self->p_uart, &ch, 1);
     return (int)ch;
 }
 
-STATIC nrfx_err_t uart_tx_char(machine_hard_uart_obj_t * self, int c) {
+STATIC nrfx_err_t uart_tx_char(const machine_hard_uart_obj_t * self, int c) {
     while (nrfx_uart_tx_in_progress(self->p_uart)) {
         ;
     }
@@ -109,13 +100,13 @@ STATIC nrfx_err_t uart_tx_char(machine_hard_uart_obj_t * self, int c) {
 }
 
 
-void uart_tx_strn(machine_hard_uart_obj_t *uart_obj, const char *str, uint len) {
+void uart_tx_strn(const machine_hard_uart_obj_t *uart_obj, const char *str, uint len) {
     for (const char *top = str + len; str < top; str++) {
         uart_tx_char(uart_obj, *str);
     }
 }
 
-void uart_tx_strn_cooked(machine_hard_uart_obj_t *uart_obj, const char *str, uint len) {
+void uart_tx_strn_cooked(const machine_hard_uart_obj_t *uart_obj, const char *str, uint len) {
     for (const char *top = str + len; str < top; str++) {
         if (*str == '\n') {
             uart_tx_char(uart_obj, '\r');
@@ -162,89 +153,89 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
 
     // get static peripheral object
     int uart_id = uart_find(args[0].u_obj);
-    machine_hard_uart_obj_t * self = &machine_hard_uart_obj[uart_id];
+    const machine_hard_uart_obj_t * self = &machine_hard_uart_obj[uart_id];
 
-    nrfx_uart_config_t * config = &self->config;
+    nrfx_uart_config_t config;
 
     // flow control
-    config->hwfc = args[5].u_int;
+    config.hwfc = args[5].u_int;
 
 #if MICROPY_HW_UART1_HWFC
-    config->hwfc = NRF_UART_HWFC_ENABLED;
+    config.hwfc = NRF_UART_HWFC_ENABLED;
 #else
-    config->hwfc = NRF_UART_HWFC_DISABLED;
+    config.hwfc = NRF_UART_HWFC_DISABLED;
 #endif
 
-    config->parity = NRF_UART_PARITY_EXCLUDED;
+    config.parity = NRF_UART_PARITY_EXCLUDED;
 
 #if (BLUETOOTH_SD == 100)
-    config->interrupt_priority = 3;
+    config.interrupt_priority = 3;
 #else
-    config->interrupt_priority = 6;
+    config.interrupt_priority = 6;
 #endif
 
     switch (args[1].u_int) {
         case 1200:
-            config->baudrate = NRF_UART_BAUDRATE_1200;
+            config.baudrate = NRF_UART_BAUDRATE_1200;
             break;
         case 2400:
-            config->baudrate = NRF_UART_BAUDRATE_2400;
+            config.baudrate = NRF_UART_BAUDRATE_2400;
             break;
         case 4800:
-            config->baudrate = NRF_UART_BAUDRATE_4800;
+            config.baudrate = NRF_UART_BAUDRATE_4800;
             break;
         case 9600:
-            config->baudrate = NRF_UART_BAUDRATE_9600;
+            config.baudrate = NRF_UART_BAUDRATE_9600;
             break;
         case 14400:
-            config->baudrate = NRF_UART_BAUDRATE_14400;
+            config.baudrate = NRF_UART_BAUDRATE_14400;
             break;
         case 19200:
-            config->baudrate = NRF_UART_BAUDRATE_19200;
+            config.baudrate = NRF_UART_BAUDRATE_19200;
             break;
         case 28800:
-            config->baudrate = NRF_UART_BAUDRATE_28800;
+            config.baudrate = NRF_UART_BAUDRATE_28800;
             break;
         case 38400:
-            config->baudrate = NRF_UART_BAUDRATE_38400;
+            config.baudrate = NRF_UART_BAUDRATE_38400;
             break;
         case 57600:
-            config->baudrate = NRF_UART_BAUDRATE_57600;
+            config.baudrate = NRF_UART_BAUDRATE_57600;
             break;
         case 76800:
-            config->baudrate = NRF_UART_BAUDRATE_76800;
+            config.baudrate = NRF_UART_BAUDRATE_76800;
             break;
         case 115200:
-            config->baudrate = NRF_UART_BAUDRATE_115200;
+            config.baudrate = NRF_UART_BAUDRATE_115200;
             break;
         case 230400:
-            config->baudrate = NRF_UART_BAUDRATE_230400;
+            config.baudrate = NRF_UART_BAUDRATE_230400;
             break;
         case 250000:
-            config->baudrate = NRF_UART_BAUDRATE_250000;
+            config.baudrate = NRF_UART_BAUDRATE_250000;
             break;
         case 1000000:
-            config->baudrate = NRF_UART_BAUDRATE_1000000;
+            config.baudrate = NRF_UART_BAUDRATE_1000000;
             break;
         default:
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-                      "UART baudrate not supported, %ul", config->baudrate));
+                      "UART baudrate not supported, %u", args[1].u_int));
             break;
     }
 
-    config->pseltxd = (&MICROPY_HW_UART1_TX)->pin;
-    config->pselrxd = (&MICROPY_HW_UART1_RX)->pin;
+    config.pseltxd = (&MICROPY_HW_UART1_TX)->pin;
+    config.pselrxd = (&MICROPY_HW_UART1_RX)->pin;
 
 #if MICROPY_HW_UART1_HWFC
-    config->pselrts = (&MICROPY_HW_UART1_RTS)->pin;
-    config->pselcts = (&MICROPY_HW_UART1_CTS)->pin;
+    config.pselrts = (&MICROPY_HW_UART1_RTS)->pin;
+    config.pselcts = (&MICROPY_HW_UART1_CTS)->pin;
 #endif
 
     // Set context to this instance of UART
-    config->p_context = (void *)self;
+    config.p_context = (void *)self;
 
     // Set NULL as callback function to keep it blocking
-    nrfx_uart_init(self->p_uart, config, NULL);
+    nrfx_uart_init(self->p_uart, &config, NULL);
 
 
     return MP_OBJ_FROM_PTR(self);
@@ -310,7 +301,7 @@ STATIC const mp_rom_map_elem_t machine_hard_uart_locals_dict_table[] = {
 STATIC MP_DEFINE_CONST_DICT(machine_hard_uart_locals_dict, machine_hard_uart_locals_dict_table);
 
 STATIC mp_uint_t machine_hard_uart_read(mp_obj_t self_in, void *buf_in, mp_uint_t size, int *errcode) {
-    machine_hard_uart_obj_t *self = self_in;
+    const machine_hard_uart_obj_t *self = self_in;
     byte *buf = buf_in;
 
     // check that size is a multiple of character width
