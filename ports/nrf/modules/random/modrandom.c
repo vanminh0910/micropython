@@ -31,6 +31,12 @@
 #include "py/runtime.h"
 #include "nrf_rng.h"
 
+#if BLUETOOTH_SD
+#include "nrf_soc.h"
+#include "ble_drv.h"
+#define BLUETOOTH_STACK_ENABLED() (ble_drv_stack_enabled())
+#endif
+
 #if MICROPY_PY_HW_RNG
 
 static inline uint32_t generate_hw_random(void) {
