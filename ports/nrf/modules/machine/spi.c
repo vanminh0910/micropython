@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2013, 2014 Damien P. George
  * Copyright (c) 2016 Glenn Ruben Bakke
+ * Copyright (c) 2018 Ayke van Laethem
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -64,47 +65,23 @@
 ///     spi.send_recv(buf, buf)              # send/recv 4 bytes from/to buf
 
 typedef struct _machine_hard_spi_obj_t {
-    mp_obj_base_t     base;
-    uint8_t           id;     // SPI instance id
-    nrfx_spi_t *      p_spi;  // Driver instance
-    nrfx_spi_config_t config; // SPI configuration
+    mp_obj_base_t base;
+    nrfx_spi_t    p_spi;  // Driver instance
 } machine_hard_spi_obj_t;
 
-static nrfx_spi_t instance0 = NRFX_SPI_INSTANCE(0);
-static nrfx_spi_t instance1 = NRFX_SPI_INSTANCE(1);
+STATIC const machine_hard_spi_obj_t machine_hard_spi_obj[] = {
+    {{&machine_hard_spi_type}, .p_spi = NRFX_SPI_INSTANCE(0)},
+    {{&machine_hard_spi_type}, .p_spi = NRFX_SPI_INSTANCE(1)},
 #if NRF52
-static nrfx_spi_t instance2 = NRFX_SPI_INSTANCE(2);
+    {{&machine_hard_spi_type}, .p_spi = NRFX_SPI_INSTANCE(2)},
 #if NRF52840_XXAA
-static nrfx_spi_t instance3 = NRFX_SPI_INSTANCE(3); // 32 Mbs master only
-#endif // NRF52840_XXAA
-#endif // NRF52
-
-STATIC machine_hard_spi_obj_t machine_hard_spi_obj[] = {
-    {{&machine_hard_spi_type}, .p_spi = &instance0},
-    {{&machine_hard_spi_type}, .p_spi = &instance1},
-#if NRF52
-    {{&machine_hard_spi_type}, .p_spi = &instance2},
-#if NRF52840_XXAA
-    {{&machine_hard_spi_type}, .p_spi = &instance3},
+    {{&machine_hard_spi_type}, .p_spi = NRFX_SPI_INSTANCE(3)},
 #endif // NRF52840_XXAA
 #endif // NRF52
 
 };
 
 void spi_init0(void) {
-    // reset the SPI handles
-    memset(&machine_hard_spi_obj[0].config, 0, sizeof(nrfx_spi_config_t));
-    machine_hard_spi_obj[0].id = 0;
-    memset(&machine_hard_spi_obj[1].config, 0, sizeof(nrfx_spi_config_t));
-    machine_hard_spi_obj[1].id = 1;
-#if NRF52
-    memset(&machine_hard_spi_obj[2].config, 0, sizeof(nrfx_spi_config_t));
-    machine_hard_spi_obj[2].id = 2;
-#if NRF52840_XXAA
-    memset(&machine_hard_spi_obj[3].config, 0, sizeof(nrfx_spi_config_t));
-    machine_hard_spi_obj[3].id = 3;
-#endif // NRF52840_XXAA
-#endif // NRF52
 }
 
 STATIC int spi_find(mp_obj_t id) {
@@ -122,8 +99,7 @@ STATIC int spi_find(mp_obj_t id) {
     } else {
         // given an integer id
         int spi_id = mp_obj_get_int(id);
-        if (spi_id >= 0 && spi_id <= MP_ARRAY_SIZE(machine_hard_spi_obj)
-            && machine_hard_spi_obj[spi_id].p_spi != NULL) {
+        if (spi_id >= 0 && spi_id < MP_ARRAY_SIZE(machine_hard_spi_obj)) {
             return spi_id;
         }
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
@@ -139,7 +115,7 @@ STATIC void spi_transfer(const machine_hard_spi_obj_t * self, size_t len, const 
 	.rx_length   = len
     };
 
-    nrfx_spi_xfer(self->p_spi, &xfer_desc, 0);
+    nrfx_spi_xfer(&self->p_spi, &xfer_desc, 0);
 }
 
 /******************************************************************************/
@@ -251,77 +227,71 @@ STATIC MP_DEFINE_CONST_DICT(machine_spi_locals_dict, machine_spi_locals_dict_tab
 
 STATIC void machine_hard_spi_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     machine_hard_spi_obj_t *self = self_in;
-    mp_printf(print, "SPI(%u, sck_pin=%u, miso_pin=%u, mosi_pin=%u, frequency=%lu, irq_prio=%u)",
-              self->id,
-              self->config.sck_pin,
-              self->config.miso_pin,
-              self->config.mosi_pin,
-              self->config.frequency,
-              self->config.irq_priority);
+    mp_printf(print, "SPI(%u)", self->p_spi.drv_inst_idx);
 }
 
 STATIC mp_obj_t machine_hard_spi_make_new(mp_arg_val_t *args) {
     // get static peripheral object
     int spi_id = spi_find(args[ARG_NEW_id].u_obj);
-    machine_hard_spi_obj_t *self = &machine_hard_spi_obj[spi_id];
+    const machine_hard_spi_obj_t *self = &machine_hard_spi_obj[spi_id];
 
-    nrfx_spi_config_t * config = &self->config;
+    nrfx_spi_config_t config;
 
     // here we would check the sck/mosi/miso pins and configure them
     if (args[ARG_NEW_sck].u_obj != MP_OBJ_NULL
         && args[ARG_NEW_mosi].u_obj != MP_OBJ_NULL
         && args[ARG_NEW_miso].u_obj != MP_OBJ_NULL) {
 
-        config->sck_pin  = ((const pin_obj_t *)args[ARG_NEW_sck].u_obj)->pin;
-        config->mosi_pin = ((const pin_obj_t *)args[ARG_NEW_mosi].u_obj)->pin;
-        config->miso_pin = ((const pin_obj_t *)args[ARG_NEW_miso].u_obj)->pin;
+        config.sck_pin  = ((const pin_obj_t *)args[ARG_NEW_sck].u_obj)->pin;
+        config.mosi_pin = ((const pin_obj_t *)args[ARG_NEW_mosi].u_obj)->pin;
+        config.miso_pin = ((const pin_obj_t *)args[ARG_NEW_miso].u_obj)->pin;
     } else {
-        config->sck_pin  = (&MICROPY_HW_SPI0_SCK)->pin;
-        config->mosi_pin = (&MICROPY_HW_SPI0_MOSI)->pin;
-        config->miso_pin = (&MICROPY_HW_SPI0_MISO)->pin;
+        config.sck_pin  = (&MICROPY_HW_SPI0_SCK)->pin;
+        config.mosi_pin = (&MICROPY_HW_SPI0_MOSI)->pin;
+        config.miso_pin = (&MICROPY_HW_SPI0_MISO)->pin;
     }
 
     // Manually trigger slave select from upper layer.
-    config->ss_pin = NRFX_SPI_PIN_NOT_USED;
+    config.ss_pin = NRFX_SPI_PIN_NOT_USED;
 
     int baudrate = args[ARG_NEW_baudrate].u_int;
 
     if (baudrate <= 125000) {
-        config->frequency = NRFX_SPI_FREQ_125K;
+        config.frequency = NRFX_SPI_FREQ_125K;
     } else if (baudrate <= 250000) {
-        config->frequency = NRFX_SPI_FREQ_250K;
+        config.frequency = NRFX_SPI_FREQ_250K;
     } else if (baudrate <= 500000) {
-        config->frequency = NRFX_SPI_FREQ_500K;
+        config.frequency = NRFX_SPI_FREQ_500K;
     } else if (baudrate <= 1000000) {
-        config->frequency = NRFX_SPI_FREQ_1M;
+        config.frequency = NRFX_SPI_FREQ_1M;
     } else if (baudrate <= 2000000) {
-        config->frequency = NRFX_SPI_FREQ_2M;
+        config.frequency = NRFX_SPI_FREQ_2M;
     } else if (baudrate <= 4000000) {
-        config->frequency = NRFX_SPI_FREQ_4M;
+        config.frequency = NRFX_SPI_FREQ_4M;
     } else if (baudrate <= 8000000) {
-        config->frequency = NRFX_SPI_FREQ_8M;
+        config.frequency = NRFX_SPI_FREQ_8M;
 #if NRF52840_XXAA
     } else if (baudrate <= 16000000) {
-        config->frequency = SPIM_FREQUENCY_FREQUENCY_M16; // Temporary value until SPIM support is addressed (EasyDMA)
+        config.frequency = SPIM_FREQUENCY_FREQUENCY_M16; // Temporary value until SPIM support is addressed (EasyDMA)
     } else if (baudrate <= 32000000) {
-        config->frequency = SPIM_FREQUENCY_FREQUENCY_M32; // Temporary value until SPIM support is addressed (EasyDMA)
+        config.frequency = SPIM_FREQUENCY_FREQUENCY_M32; // Temporary value until SPIM support is addressed (EasyDMA)
 #endif
     } else { // Default
-        config->frequency = NRFX_SPI_FREQ_1M;
+        config.frequency = NRFX_SPI_FREQ_1M;
     }
 
 #ifdef NRF51
-    config->irq_priority = 3;
+    config.irq_priority = 3;
 #else
-    config->irq_priority = 6;
+    config.irq_priority = 6;
 #endif
 
-    config->mode = NRFX_SPI_MODE_0;
-    config->orc  = 0xFF; // Overrun character
-    config->bit_order = (args[ARG_NEW_firstbit].u_int == 0) ? NRFX_SPI_BIT_ORDER_MSB_FIRST : NRFX_SPI_BIT_ORDER_LSB_FIRST;
+    config.mode = NRFX_SPI_MODE_0;
+    config.orc  = 0xFF; // Overrun character
+    config.bit_order = (args[ARG_NEW_firstbit].u_int == 0) ? NRFX_SPI_BIT_ORDER_MSB_FIRST : NRFX_SPI_BIT_ORDER_LSB_FIRST;
 
     // Set context to this instance of SPI
-    nrfx_spi_init(self->p_spi, config, NULL, (void *)self);
+    nrfx_spi_init(&self->p_spi, &config, NULL, (void *)self);
 
     return MP_OBJ_FROM_PTR(self);
 }
@@ -335,7 +305,7 @@ STATIC void machine_hard_spi_deinit(mp_obj_t self_in) {
 }
 
 STATIC void machine_hard_spi_transfer(mp_obj_base_t *self_in, size_t len, const uint8_t *src, uint8_t *dest) {
-    machine_hard_spi_obj_t *self = (machine_hard_spi_obj_t*)self_in;
+    const machine_hard_spi_obj_t *self = (machine_hard_spi_obj_t*)self_in;
     spi_transfer(self, len, src, dest);
 }
 
