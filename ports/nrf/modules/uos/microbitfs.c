@@ -31,8 +31,8 @@
 #include <sys/stat.h>
 
 #include "microbitfs.h"
-#include "hal/hal_nvmc.h"
-#include "hal/hal_rng.h"
+#include "nrf_nvmc.h"
+#include "modrandom.h"
 #include "py/nlr.h"
 #include "py/obj.h"
 #include "py/stream.h"
@@ -48,6 +48,17 @@
 #else
 #define DEBUG(s) (void)0
 #endif
+
+#if defined(NRF51)
+#define HAL_NVMC_PAGESIZE (1024)
+
+#elif defined(NRF52)
+#define HAL_NVMC_PAGESIZE (4096)
+#else
+#error Unknown chip
+#endif
+
+#define HAL_NVMC_IS_PAGE_ALIGNED(addr) ((uint32_t)(addr) & (HAL_NVMC_PAGESIZE - 1))
 
 /**  How it works:
  * The File System consists of up to MAX_CHUNKS_IN_FILE_SYSTEM chunks of CHUNK_SIZE each,
@@ -177,7 +188,7 @@ STATIC void init_limits(void) {
 }
 
 STATIC void randomise_start_index(void) {
-    start_index = hal_rng_generate() / (chunks_in_file_system-1) + 1;
+    start_index = machine_rng_generate_random_word() % chunks_in_file_system + 1;
 }
 
 void microbit_filesystem_init(void) {
@@ -189,20 +200,20 @@ void microbit_filesystem_init(void) {
     } else if (((file_chunk *)last_page())->marker == PERSISTENT_DATA_MARKER) {
         file_system_chunks = &base[-1];
     } else {
-        hal_nvmc_write_byte(&((file_chunk *)last_page())->marker, PERSISTENT_DATA_MARKER);
+        nrf_nvmc_write_byte((uint32_t)&((file_chunk *)last_page())->marker, PERSISTENT_DATA_MARKER);
         file_system_chunks = &base[-1];
     }
 }
 
 STATIC void copy_page(void *dest, void *src) {
     DEBUG(("FILE DEBUG: Copying page from %lx to %lx.\r\n", (uint32_t)src, (uint32_t)dest));
-    hal_nvmc_erase_page((uint32_t)dest);
+    nrf_nvmc_page_erase((uint32_t)dest);
     file_chunk *src_chunk = src;
     file_chunk *dest_chunk = dest;
     uint32_t chunks = HAL_NVMC_PAGESIZE>>MBFS_LOG_CHUNK_SIZE;
     for (uint32_t i = 0; i < chunks; i++) {
         if (src_chunk[i].marker != FREED_CHUNK) {
-            hal_nvmc_write_buffer(&dest_chunk[i], &src_chunk[i], CHUNK_SIZE);
+            nrf_nvmc_write_bytes((uint32_t)&dest_chunk[i], (uint8_t*)&src_chunk[i], CHUNK_SIZE);
         }
     }
 }
@@ -237,12 +248,12 @@ STATIC void filesystem_sweep(void) {
     }
     while (page != end_page) {
         uint8_t *next_page = page+step;
-        hal_nvmc_erase_page((uint32_t)page);
+        nrf_nvmc_page_erase((uint32_t)page);
         copy_page(page, next_page);
         page = next_page;
     }
-    hal_nvmc_erase_page((uint32_t)end_page);
-    hal_nvmc_write_buffer(end_page, &config, sizeof(config));
+    nrf_nvmc_page_erase((uint32_t)end_page);
+    nrf_nvmc_write_bytes((uint32_t)end_page, (uint8_t*)&config, sizeof(config));
     microbit_filesystem_init();
 }
 
@@ -306,7 +317,7 @@ STATIC uint8_t find_chunk_and_erase(void) {
             }
             if (i == chunks_per_page) {
                 DEBUG(("FILE DEBUG: Found freed page of chunks: %d\r\n", index));
-                hal_nvmc_erase_page((uint32_t)&file_system_chunks[index]);
+                nrf_nvmc_page_erase((uint32_t)&file_system_chunks[index]);
                 return index;
             }
         }
@@ -331,7 +342,7 @@ STATIC file_descriptor_obj *microbit_file_descriptor_new(uint8_t start_chunk, bo
 
 STATIC void clear_file(uint8_t chunk) {
     do {
-        hal_nvmc_write_byte(&(file_system_chunks[chunk].marker), FREED_CHUNK);
+        nrf_nvmc_write_byte((uint32_t)&(file_system_chunks[chunk].marker), FREED_CHUNK);
         DEBUG(("FILE DEBUG: Freeing chunk %d.\n", chunk));
         chunk = file_system_chunks[chunk].next_chunk;
     } while (chunk <= chunks_in_file_system);
@@ -351,9 +362,9 @@ STATIC file_descriptor_obj *microbit_file_open(const char *name, size_t name_len
         if (index == FILE_NOT_FOUND) {
             mp_raise_OSError(MP_ENOSPC);
         }
-        hal_nvmc_write_byte(&(file_system_chunks[index].marker), FILE_START);
-        hal_nvmc_write_byte(&(file_system_chunks[index].header.name_len), name_len);
-        hal_nvmc_write_buffer(&(file_system_chunks[index].header.filename[0]), name, name_len);
+        nrf_nvmc_write_byte((uint32_t)&(file_system_chunks[index].marker), FILE_START);
+        nrf_nvmc_write_byte((uint32_t)&(file_system_chunks[index].header.name_len), name_len);
+        nrf_nvmc_write_bytes((uint32_t)&(file_system_chunks[index].header.filename[0]), (uint8_t*)name, name_len);
     } else {
         if (index == FILE_NOT_FOUND) {
             return NULL;
@@ -408,8 +419,8 @@ STATIC int advance(file_descriptor_obj *self, uint32_t n, bool write) {
                 return ENOSPC;
             }
             // Link next chunk to this one
-            hal_nvmc_write_byte(&(file_system_chunks[self->seek_chunk].next_chunk), next_chunk);
-            hal_nvmc_write_byte(&(file_system_chunks[next_chunk].marker), self->seek_chunk);
+            nrf_nvmc_write_byte((uint32_t)&(file_system_chunks[self->seek_chunk].next_chunk), next_chunk);
+            nrf_nvmc_write_byte((uint32_t)&(file_system_chunks[next_chunk].marker), self->seek_chunk);
         }
         self->seek_chunk = file_system_chunks[self->seek_chunk].next_chunk;
     }
@@ -458,7 +469,7 @@ STATIC mp_uint_t microbit_file_write(mp_obj_t obj, const void *buf, mp_uint_t si
     const uint8_t *data = buf;
     while (len) {
         uint32_t to_write = MIN(((uint32_t)(DATA_PER_CHUNK - self->seek_offset)), len);
-        hal_nvmc_write_buffer(seek_address(self), data, to_write);
+        nrf_nvmc_write_bytes((uint32_t)seek_address(self), data, to_write);
         int err = advance(self, to_write, true);
         if (err) {
             *errcode = err;
@@ -472,7 +483,7 @@ STATIC mp_uint_t microbit_file_write(mp_obj_t obj, const void *buf, mp_uint_t si
 
 STATIC void microbit_file_close(file_descriptor_obj *fd) {
     if (fd->writable) {
-        hal_nvmc_write_byte(&(file_system_chunks[fd->start_chunk].header.end_offset), fd->seek_offset);
+        nrf_nvmc_write_byte((uint32_t)&(file_system_chunks[fd->start_chunk].header.end_offset), fd->seek_offset);
     }
     fd->open = false;
 }

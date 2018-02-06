@@ -148,6 +148,10 @@ SRC_NRFX += $(addprefix lib/nrfx/drivers/src/,\
 	nrfx_timer.c \
 	)
 
+SRC_NRF_HAL += $(addprefix lib/nrfx/hal/,\
+	nrf_nvmc.c \
+	)
+
 SRC_C += \
 	main.c \
 	mphalport.c \
@@ -202,6 +206,7 @@ FROZEN_MPY_MPY_FILES := $(addprefix $(BUILD)/,$(FROZEN_MPY_PY_FILES:.py=.mpy))
 OBJ += $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(SRC_NRF_HAL:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
 OBJ += $(BUILD)/pins_gen.o
 

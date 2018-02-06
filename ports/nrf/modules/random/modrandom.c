@@ -30,6 +30,7 @@
 
 #include "py/runtime.h"
 #include "nrf_rng.h"
+#include "modrandom.h"
 
 #if BLUETOOTH_SD
 #include "nrf_soc.h"
@@ -60,7 +61,7 @@ static inline uint32_t generate_hw_random(void) {
     return retval;
 }
 
-static inline uint32_t generate_random_word(void) {
+uint32_t machine_rng_generate_random_word(void) {
 
 #if BLUETOOTH_SD
     if (BLUETOOTH_STACK_ENABLED() == 1) {
@@ -78,7 +79,7 @@ static inline uint32_t generate_random_word(void) {
 }
 
 static inline int rand30() {
-    uint32_t val = generate_random_word();
+    uint32_t val = machine_rng_generate_random_word();
     return (val & 0x3fffffff); // binary mask b00111111111111111111111111111111
 }
 
