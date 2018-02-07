@@ -26,10 +26,6 @@
  * THE SOFTWARE.
  */
 
-#include <stdbool.h>
-#include <string.h>
-#include <stdarg.h>
-
 #include "py/nlr.h"
 #include "py/runtime.h"
 #include "py/stream.h"
@@ -42,21 +38,21 @@
 #include "mpconfigboard.h"
 #include "nrf.h"
 #include "mphalport.h"
-#include "nrfx_uart.h"
+#include "nrf_uart.h"
 
 
 #if MICROPY_PY_MACHINE_UART
 
 typedef struct _machine_hard_uart_obj_t {
-    mp_obj_base_t       base;
-    const nrfx_uart_t * p_uart;      // Driver instance
-    byte                char_width;  // 0 for 7,8 bit chars, 1 for 9 bit chars
+    mp_obj_base_t   base;
+    NRF_UART_Type * p_reg;
 } machine_hard_uart_obj_t;
 
-static const nrfx_uart_t instance0 = NRFX_UART_INSTANCE(0);
-
 STATIC const machine_hard_uart_obj_t machine_hard_uart_obj[] = {
-    {{&machine_hard_uart_type}, .p_uart = &instance0},
+    {{&machine_hard_uart_type}, .p_reg = NRF_UART0},
+#if NRF52840_XXAA
+    {{&machine_hard_uart_type}, .p_reg = NRF_UART1},
+#endif
 };
 
 void uart_init0(void) {
@@ -82,17 +78,37 @@ bool uart_rx_any(const machine_hard_uart_obj_t *uart_obj) {
 }
 
 int uart_rx_char(const machine_hard_uart_obj_t * self) {
-    uint8_t ch;
-    nrfx_uart_rx(self->p_uart, &ch, 1);
-    return (int)ch;
-}
-
-STATIC nrfx_err_t uart_tx_char(const machine_hard_uart_obj_t * self, int c) {
-    while (nrfx_uart_tx_in_progress(self->p_uart)) {
-        ;
+    // Wait until there is a byte in the internal buffer.
+    // The UART has an internal FIFO of 6 bytes.
+    while (1) {
+        if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_RXDRDY))
+            break;
+        if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_ERROR))
+            return -MP_EIO;
+        if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_RXTO))
+            return -MP_ETIMEDOUT;
     }
 
-    return nrfx_uart_tx(self->p_uart, (uint8_t *)&c, 1);
+    // Get the received byte.
+    nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_RXDRDY);
+    int ch = nrf_uart_rxd_get(self->p_reg);
+
+    return ch;
+}
+
+STATIC void uart_tx_char(const machine_hard_uart_obj_t * self, int c) {
+    // Start a transmission sequence.
+    nrf_uart_task_trigger(self->p_reg, NRF_UART_TASK_STARTTX);
+
+    // Send this character.
+    nrf_uart_txd_set(self->p_reg, c);
+
+    // Wait until it is sent.
+    while (!nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_TXDRDY)) { }
+    nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_TXDRDY);
+
+    // Stop transmission sequence.
+    nrf_uart_task_trigger(self->p_reg, NRF_UART_TASK_STOPTX);
 }
 
 
@@ -152,67 +168,51 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
     int uart_id = uart_find(args[ARG_id].u_obj);
     const machine_hard_uart_obj_t * self = &machine_hard_uart_obj[uart_id];
 
-    nrfx_uart_config_t config;
-
-    // flow control
-    config.hwfc = args[ARG_flow].u_int;
-
-#if MICROPY_HW_UART1_HWFC
-    config.hwfc = NRF_UART_HWFC_ENABLED;
-#else
-    config.hwfc = NRF_UART_HWFC_DISABLED;
-#endif
-
-    config.parity = NRF_UART_PARITY_EXCLUDED;
-
-#if (BLUETOOTH_SD == 100)
-    config.interrupt_priority = 3;
-#else
-    config.interrupt_priority = 6;
-#endif
-
+    // Map baudrates from the input number to the constant as used in the
+    // UART peripheral.
+    nrf_uart_baudrate_t baudrate;
     switch (args[ARG_baudrate].u_int) {
         case 1200:
-            config.baudrate = NRF_UART_BAUDRATE_1200;
+            baudrate = NRF_UART_BAUDRATE_1200;
             break;
         case 2400:
-            config.baudrate = NRF_UART_BAUDRATE_2400;
+            baudrate = NRF_UART_BAUDRATE_2400;
             break;
         case 4800:
-            config.baudrate = NRF_UART_BAUDRATE_4800;
+            baudrate = NRF_UART_BAUDRATE_4800;
             break;
         case 9600:
-            config.baudrate = NRF_UART_BAUDRATE_9600;
+            baudrate = NRF_UART_BAUDRATE_9600;
             break;
         case 14400:
-            config.baudrate = NRF_UART_BAUDRATE_14400;
+            baudrate = NRF_UART_BAUDRATE_14400;
             break;
         case 19200:
-            config.baudrate = NRF_UART_BAUDRATE_19200;
+            baudrate = NRF_UART_BAUDRATE_19200;
             break;
         case 28800:
-            config.baudrate = NRF_UART_BAUDRATE_28800;
+            baudrate = NRF_UART_BAUDRATE_28800;
             break;
         case 38400:
-            config.baudrate = NRF_UART_BAUDRATE_38400;
+            baudrate = NRF_UART_BAUDRATE_38400;
             break;
         case 57600:
-            config.baudrate = NRF_UART_BAUDRATE_57600;
+            baudrate = NRF_UART_BAUDRATE_57600;
             break;
         case 76800:
-            config.baudrate = NRF_UART_BAUDRATE_76800;
+            baudrate = NRF_UART_BAUDRATE_76800;
             break;
         case 115200:
-            config.baudrate = NRF_UART_BAUDRATE_115200;
+            baudrate = NRF_UART_BAUDRATE_115200;
             break;
         case 230400:
-            config.baudrate = NRF_UART_BAUDRATE_230400;
+            baudrate = NRF_UART_BAUDRATE_230400;
             break;
         case 250000:
-            config.baudrate = NRF_UART_BAUDRATE_250000;
+            baudrate = NRF_UART_BAUDRATE_250000;
             break;
         case 1000000:
-            config.baudrate = NRF_UART_BAUDRATE_1000000;
+            baudrate = NRF_UART_BAUDRATE_1000000;
             break;
         default:
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
@@ -220,21 +220,43 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
             break;
     }
 
-    config.pseltxd = MICROPY_HW_UART1_TX;
-    config.pselrxd = MICROPY_HW_UART1_RX;
+    // Configure TX and RX GPIO pins: tx as output (and initially high)
+    // and rx as input.
+    nrf_gpio_pin_set(MICROPY_HW_UART1_TX);
+    nrf_gpio_cfg_output(MICROPY_HW_UART1_TX);
+    nrf_gpio_cfg_input(MICROPY_HW_UART1_RX, NRF_GPIO_PIN_NOPULL);
+
+    // Set the UART to use these tx/rx pins.
+    nrf_uart_txrx_pins_set(self->p_reg, MICROPY_HW_UART1_TX, MICROPY_HW_UART1_RX);
 
 #if MICROPY_HW_UART1_HWFC
-    config.pselrts = MICROPY_HW_UART1_RTS;
-    config.pselcts = MICROPY_HW_UART1_CTS;
+    // Configure CTS and RTS pins: CTS as input and RTS as output (and
+    // initially high).
+    // TODO: currently using a workaround by pulling the CTS pin low.
+    // Otherwise UART won't work properly on PCA10040 boards.
+    nrf_gpio_cfg_input(MICROPY_HW_UART1_CTS, NRF_GPIO_PIN_NOPULL);
+    nrf_gpio_pin_set(MICROPY_HW_UART1_RTS);
+    nrf_gpio_cfg_output(MICROPY_HW_UART1_RTS);
+
+    // Set the UART driver to use these RTS/CTS pins.
+    nrf_uart_hwfc_pins_set(self->p_reg, MICROPY_HW_UART1_RTS, MICROPY_HW_UART1_CTS);
+
+    nrf_uart_hwfc_t hwfc = NRF_UART_HWFC_ENABLED;
+
+#else
+    // Do not use flow control.
+    nrf_uart_hwfc_t hwfc = NRF_UART_HWFC_DISABLED;
 #endif
 
-    // Set context to this instance of UART
-    config.p_context = (void *)self;
+    // Other configuration: no parity and optional flow control.
+    nrf_uart_configure(self->p_reg, NRF_UART_PARITY_EXCLUDED, hwfc);
+    nrf_uart_baudrate_set(self->p_reg, baudrate);
 
-    // Set NULL as callback function to keep it blocking
-    nrfx_uart_init(self->p_uart, &config, NULL);
+    // Finally, enable the UART.
+    nrf_uart_enable(self->p_reg);
 
-    nrfx_uart_rx_enable(self->p_uart);
+    // Start a receive sequence. This will always be enabled.
+    nrf_uart_task_trigger(self->p_reg, NRF_UART_TASK_STARTRX);
 
     return MP_OBJ_FROM_PTR(self);
 }
@@ -248,13 +270,8 @@ STATIC mp_obj_t machine_hard_uart_writechar(mp_obj_t self_in, mp_obj_t char_in) 
     // get the character to write (might be 9 bits)
     uint16_t data = mp_obj_get_int(char_in);
 
-    nrfx_err_t err = NRFX_SUCCESS;
     for (int i = 0; i < 2; i++) {
-        err = uart_tx_char(self, (int)(&data)[i]);
-    }
-
-    if (err != NRFX_SUCCESS) {
-        mp_hal_raise(err);
+        uart_tx_char(self, (int)(&data)[i]);
     }
 
     return mp_const_none;
@@ -266,7 +283,11 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(machine_hard_uart_writechar_obj, machine_hard_u
 /// Return value: The character read, as an integer.  Returns -1 on timeout.
 STATIC mp_obj_t machine_hard_uart_readchar(mp_obj_t self_in) {
     machine_hard_uart_obj_t *self = self_in;
-    return MP_OBJ_NEW_SMALL_INT(uart_rx_char(self));
+    int ch = uart_rx_char(self);
+    if (ch < 0) {
+        mp_raise_OSError(ch);
+    }
+    return MP_OBJ_NEW_SMALL_INT(ch);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(machine_hard_uart_readchar_obj, machine_hard_uart_readchar);
 
@@ -302,15 +323,6 @@ STATIC mp_uint_t machine_hard_uart_read(mp_obj_t self_in, void *buf_in, mp_uint_
     const machine_hard_uart_obj_t *self = self_in;
     byte *buf = buf_in;
 
-    // check that size is a multiple of character width
-    if (size & self->char_width) {
-        *errcode = MP_EIO;
-        return MP_STREAM_ERROR;
-    }
-
-    // convert byte size to char size
-    size >>= self->char_width;
-
     // make sure we want at least 1 char
     if (size == 0) {
         return 0;
@@ -319,9 +331,13 @@ STATIC mp_uint_t machine_hard_uart_read(mp_obj_t self_in, void *buf_in, mp_uint_
     // read the data
     byte * orig_buf = buf;
     for (;;) {
-        int data = uart_rx_char(self);
+        int c = uart_rx_char(self);
+        if (c < 0) {
+            *errcode = MP_EIO;
+            return MP_STREAM_ERROR;
+        }
 
-        *buf++ = data;
+        *buf++ = c;
 
         if (--size == 0) {
             // return number of bytes read
@@ -334,24 +350,11 @@ STATIC mp_uint_t machine_hard_uart_write(mp_obj_t self_in, const void *buf_in, m
     machine_hard_uart_obj_t *self = self_in;
     const byte *buf = buf_in;
 
-    // check that size is a multiple of character width
-    if (size & self->char_width) {
-        *errcode = MP_EIO;
-        return MP_STREAM_ERROR;
-    }
-
-    nrfx_err_t err = NRFX_SUCCESS;
     for (int i = 0; i < size; i++) {
-        err = uart_tx_char(self, (int)((uint8_t *)buf)[i]);
+        uart_tx_char(self, (int)((uint8_t *)buf)[i]);
     }
 
-    if (err == NRFX_SUCCESS) {
-        // return number of bytes written
-        return size;
-    } else {
-        *errcode = mp_hal_status_to_errno_table[err];
-        return MP_STREAM_ERROR;
-    }
+    return size;
 }
 
 STATIC mp_uint_t machine_hard_uart_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg, int *errcode) {
