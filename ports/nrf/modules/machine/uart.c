@@ -39,6 +39,7 @@
 #include "nrf.h"
 #include "mphalport.h"
 #include "nrf_uart.h"
+#include "lib/utils/interrupt_char.h"
 
 
 #if MICROPY_PY_MACHINE_UART
@@ -46,12 +47,18 @@
 typedef struct _machine_hard_uart_obj_t {
     mp_obj_base_t   base;
     NRF_UART_Type * p_reg;
+    bool          * tx_started;
 } machine_hard_uart_obj_t;
 
-STATIC const machine_hard_uart_obj_t machine_hard_uart_obj[] = {
-    {{&machine_hard_uart_type}, .p_reg = NRF_UART0},
+STATIC bool uart0_tx_started;
 #if NRF52840_XXAA
-    {{&machine_hard_uart_type}, .p_reg = NRF_UART1},
+STATIC bool uart1_tx_started;
+#endif
+
+STATIC const machine_hard_uart_obj_t machine_hard_uart_obj[] = {
+    {{&machine_hard_uart_type}, .p_reg = NRF_UART0, .tx_started=&uart0_tx_started},
+#if NRF52840_XXAA
+    {{&machine_hard_uart_type}, .p_reg = NRF_UART1, .tx_started=&uart1_tx_started},
 #endif
 };
 
@@ -100,15 +107,15 @@ STATIC void uart_tx_char(const machine_hard_uart_obj_t * self, int c) {
     // Start a transmission sequence.
     nrf_uart_task_trigger(self->p_reg, NRF_UART_TASK_STARTTX);
 
+    // Wait until the previous char is sent.
+    if (*self->tx_started) {
+        while (!nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_TXDRDY)) { }
+        nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_TXDRDY);
+    }
+
     // Send this character.
     nrf_uart_txd_set(self->p_reg, c);
-
-    // Wait until it is sent.
-    while (!nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_TXDRDY)) { }
-    nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_TXDRDY);
-
-    // Stop transmission sequence.
-    nrf_uart_task_trigger(self->p_reg, NRF_UART_TASK_STOPTX);
+    *self->tx_started = true;
 }
 
 
