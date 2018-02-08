@@ -41,24 +41,30 @@
 #include "nrf_uart.h"
 #include "lib/utils/interrupt_char.h"
 
+typedef struct {
+    bool            tx_started;
+    volatile int8_t rxbuf_rpos;
+    volatile int8_t rxbuf_wpos;
+    uint8_t         rxbuf_buf[8];
+} uart_data_t;
 
 #if MICROPY_PY_MACHINE_UART
 
 typedef struct _machine_hard_uart_obj_t {
     mp_obj_base_t   base;
     NRF_UART_Type * p_reg;
-    bool          * tx_started;
+    uart_data_t   * data;
 } machine_hard_uart_obj_t;
 
-STATIC bool uart0_tx_started;
+STATIC uart_data_t uart0_data;
 #if NRF52840_XXAA
-STATIC bool uart1_tx_started;
+STATIC uart_data_t uart1_data;
 #endif
 
 STATIC const machine_hard_uart_obj_t machine_hard_uart_obj[] = {
-    {{&machine_hard_uart_type}, .p_reg = NRF_UART0, .tx_started=&uart0_tx_started},
+    {{&machine_hard_uart_type}, .p_reg = NRF_UART0, .data=&uart0_data},
 #if NRF52840_XXAA
-    {{&machine_hard_uart_type}, .p_reg = NRF_UART1, .tx_started=&uart1_tx_started},
+    {{&machine_hard_uart_type}, .p_reg = NRF_UART1, .data=&uart1_data},
 #endif
 };
 
@@ -75,9 +81,59 @@ STATIC int uart_find(mp_obj_t id) {
               "UART(%d) does not exist", uart_id));
 }
 
-void uart_irq_handler(mp_uint_t uart_id) {
+STATIC void uart_irq_handler(const machine_hard_uart_obj_t *self) {
+    int8_t wpos = self->data->rxbuf_wpos;
+    if (wpos < 0) {
+        // Wait until the error is handled.
+        // TODO: can it get stuck this way?
+        return;
+    }
 
+    if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_RXDRDY)) {
+        nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_RXDRDY);
+
+        int8_t wpos_next = (wpos + 1) % sizeof(self->data->rxbuf_buf);
+
+        // Is the buffer full?
+        if (self->data->rxbuf_rpos == wpos_next) {
+            // Yes, drop the oldest byte in the buffer by moving the read
+            // position one forward.
+            self->data->rxbuf_rpos = (wpos_next + 1) % sizeof(self->data->rxbuf_buf);
+        }
+
+        // Add the received byte to the ringbuffer.
+        uint8_t ch = nrf_uart_rxd_get(self->p_reg);
+        self->data->rxbuf_buf[wpos] = ch;
+        self->data->rxbuf_wpos = wpos_next;
+
+        #if MICROPY_KBD_EXCEPTION
+        if (ch == mp_interrupt_char) {
+            // Signal a KeyboardInterrupt
+            mp_keyboard_interrupt();
+        }
+        #endif
+    }
+
+    // Handle UART receive errors
+    if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_ERROR)) {
+        nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_ERROR);
+        self->data->rxbuf_wpos = -MP_EIO;
+    }
+    if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_RXTO)) {
+        nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_RXTO);
+        self->data->rxbuf_wpos = -MP_ETIMEDOUT;
+    }
 }
+
+void UART0_IRQHandler() {
+    uart_irq_handler(&machine_hard_uart_obj[0]);
+}
+
+#if NRF52840_XXAA
+void UART1_IRQHandler() {
+    uart_irq_handler(&machine_hard_uart_obj[1]);
+}
+#endif
 
 bool uart_rx_any(const machine_hard_uart_obj_t *uart_obj) {
     // TODO: uart will block for now.
@@ -85,22 +141,26 @@ bool uart_rx_any(const machine_hard_uart_obj_t *uart_obj) {
 }
 
 int uart_rx_char(const machine_hard_uart_obj_t * self) {
-    // Wait until there is a byte in the internal buffer.
-    // The UART has an internal FIFO of 6 bytes.
+    int8_t rpos = self->data->rxbuf_rpos;
     while (1) {
-        if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_RXDRDY))
-            break;
-        if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_ERROR))
-            return -MP_EIO;
-        if (nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_RXTO))
-            return -MP_ETIMEDOUT;
+        // Is there an error on the line?
+        int8_t wpos = self->data->rxbuf_wpos;
+        if (wpos < 0) {
+            // Yes, clear and return it.
+            self->data->rxbuf_wpos = rpos;
+            return wpos;
+        }
+
+        // Is there a character ready?
+        if (wpos != rpos) {
+            int ch = self->data->rxbuf_buf[rpos];
+            self->data->rxbuf_rpos = (rpos + 1) % sizeof(self->data->rxbuf_buf);
+            return ch;
+        }
+
+        // Wait until the next interrupt.
+        __WFE();
     }
-
-    // Get the received byte.
-    nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_RXDRDY);
-    int ch = nrf_uart_rxd_get(self->p_reg);
-
-    return ch;
 }
 
 STATIC void uart_tx_char(const machine_hard_uart_obj_t * self, int c) {
@@ -108,14 +168,14 @@ STATIC void uart_tx_char(const machine_hard_uart_obj_t * self, int c) {
     nrf_uart_task_trigger(self->p_reg, NRF_UART_TASK_STARTTX);
 
     // Wait until the previous char is sent.
-    if (*self->tx_started) {
+    if (self->data->tx_started) {
         while (!nrf_uart_event_check(self->p_reg, NRF_UART_EVENT_TXDRDY)) { }
         nrf_uart_event_clear(self->p_reg, NRF_UART_EVENT_TXDRDY);
     }
 
     // Send this character.
     nrf_uart_txd_set(self->p_reg, c);
-    *self->tx_started = true;
+    self->data->tx_started = true;
 }
 
 
@@ -264,6 +324,13 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
 
     // Start a receive sequence. This will always be enabled.
     nrf_uart_task_trigger(self->p_reg, NRF_UART_TASK_STARTRX);
+
+    NRFX_IRQ_PRIORITY_SET(nrfx_get_irq_number(self->p_reg), 3);
+    NRFX_IRQ_ENABLE(nrfx_get_irq_number(self->p_reg));
+
+    nrf_uart_int_enable(self->p_reg, NRF_UART_INT_MASK_RXDRDY |
+                                     NRF_UART_INT_MASK_ERROR  |
+                                     NRF_UART_INT_MASK_RXTO);
 
     return MP_OBJ_FROM_PTR(self);
 }
