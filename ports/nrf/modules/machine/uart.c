@@ -240,57 +240,22 @@ STATIC mp_obj_t machine_hard_uart_make_new(const mp_obj_type_t *type, size_t n_a
     int uart_id = uart_find(args[ARG_id].u_obj);
     const machine_hard_uart_obj_t * self = &machine_hard_uart_obj[uart_id];
 
-    // Map baudrates from the input number to the constant as used in the
-    // UART peripheral.
-    nrf_uart_baudrate_t baudrate;
-    switch (args[ARG_baudrate].u_int) {
-        case 1200:
-            baudrate = NRF_UART_BAUDRATE_1200;
-            break;
-        case 2400:
-            baudrate = NRF_UART_BAUDRATE_2400;
-            break;
-        case 4800:
-            baudrate = NRF_UART_BAUDRATE_4800;
-            break;
-        case 9600:
-            baudrate = NRF_UART_BAUDRATE_9600;
-            break;
-        case 14400:
-            baudrate = NRF_UART_BAUDRATE_14400;
-            break;
-        case 19200:
-            baudrate = NRF_UART_BAUDRATE_19200;
-            break;
-        case 28800:
-            baudrate = NRF_UART_BAUDRATE_28800;
-            break;
-        case 38400:
-            baudrate = NRF_UART_BAUDRATE_38400;
-            break;
-        case 57600:
-            baudrate = NRF_UART_BAUDRATE_57600;
-            break;
-        case 76800:
-            baudrate = NRF_UART_BAUDRATE_76800;
-            break;
-        case 115200:
-            baudrate = NRF_UART_BAUDRATE_115200;
-            break;
-        case 230400:
-            baudrate = NRF_UART_BAUDRATE_230400;
-            break;
-        case 250000:
-            baudrate = NRF_UART_BAUDRATE_250000;
-            break;
-        case 1000000:
-            baudrate = NRF_UART_BAUDRATE_1000000;
-            break;
-        default:
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
-                      "UART baudrate not supported, %u", args[ARG_baudrate].u_int));
-            break;
+    // These baudrates are not supported, it seems.
+    if (args[ARG_baudrate].u_int < 1200 || args[ARG_baudrate].u_int > 1000000) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError,
+                  "UART baudrate not supported, %u", args[ARG_baudrate].u_int));
     }
+
+    // Magic: calculate 'baudrate' register from the input number.
+    // Every value listed in the datasheet will be converted to the
+    // correct register value, except for 192600. I suspect the value
+    // listed in the nrf52 datasheet (0x0EBED000) is incorrectly rounded
+    // and should be 0x0EBEE000, as the nrf51 datasheet lists the
+    // nonrounded value 0x0EBEDFA4.
+    // Some background:
+    // https://devzone.nordicsemi.com/f/nordic-q-a/391/uart-baudrate-register-values/2046#2046
+    nrf_uart_baudrate_t baudrate = args[ARG_baudrate].u_int / 400 * (uint32_t)(400ULL * (uint64_t)UINT32_MAX / 16000000ULL);
+    baudrate = (baudrate + 0x800) & 0xffffff000; // rounding
 
     // Configure TX and RX GPIO pins: tx as output (and initially high)
     // and rx as input.
