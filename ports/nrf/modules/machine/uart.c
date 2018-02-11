@@ -101,17 +101,22 @@ STATIC void uart_irq_handler(const machine_hard_uart_obj_t *self) {
             self->data->rxbuf_rpos = (wpos_next + 1) % sizeof(self->data->rxbuf_buf);
         }
 
-        // Add the received byte to the ringbuffer.
         uint8_t ch = nrf_uart_rxd_get(self->p_reg);
-        self->data->rxbuf_buf[wpos] = ch;
-        self->data->rxbuf_wpos = wpos_next;
 
         #if MICROPY_KBD_EXCEPTION
         if (ch == mp_interrupt_char) {
             // Signal a KeyboardInterrupt
             mp_keyboard_interrupt();
-        }
+
+            // clear ringbuffer
+            self->data->rxbuf_rpos = wpos;
+        } else
         #endif
+        {
+            // Add the received byte to the ringbuffer.
+            self->data->rxbuf_buf[wpos] = ch;
+            self->data->rxbuf_wpos = wpos_next;
+        }
     }
 
     // Handle UART receive errors
