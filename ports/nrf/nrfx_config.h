@@ -4,6 +4,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2018 Glenn Ruben Bakke
+ * Copyright (c) 2018 Ayke van Laethem
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +28,8 @@
 #ifndef NRFX_CONFIG_H
 #define NRFX_CONFIG_H
 
+#include "mpconfigboard.h"
+
 // Port specific defines
 #ifndef NRFX_LOG_ENABLED
 #define NRFX_LOG_ENABLED 0
@@ -41,34 +44,34 @@
 #define NRFX_UART_ENABLED 1
 #define NRFX_UART0_ENABLED 1
 
-#define NRFX_TWI_ENABLED 1
+#define NRFX_TWI_ENABLED (MICROPY_PY_MACHINE_I2C)
 #define NRFX_TWI0_ENABLED 1
 #define NRFX_TWI1_ENABLED 1
 
-#define NRFX_SPI_ENABLED 1
+#define NRFX_SPI_ENABLED (MICROPY_PY_MACHINE_HW_SPI)
 #define NRFX_SPI0_ENABLED 1
 #define NRFX_SPI1_ENABLED 1
-#define NRFX_SPI2_ENABLED 1
+#define NRFX_SPI2_ENABLED (!NRF51)
 // 0 NRF_GPIO_PIN_NOPULL
 // 1 NRF_GPIO_PIN_PULLDOWN
 // 3 NRF_GPIO_PIN_PULLUP
 #define NRFX_SPI_MISO_PULL_CFG 1
 
-#define NRFX_RTC_ENABLED 1
+#define NRFX_RTC_ENABLED (MICROPY_PY_MACHINE_RTCOUNTER)
 #define NRFX_RTC0_ENABLED 1
 #define NRFX_RTC1_ENABLED 1
-#define NRFX_RTC2_ENABLED 1
+#define NRFX_RTC2_ENABLED (!NRF51)
 
-#define NRFX_TIMER_ENABLED 1
+#define NRFX_TIMER_ENABLED (MICROPY_PY_MACHINE_TIMER)
 #define NRFX_TIMER0_ENABLED 1
 #define NRFX_TIMER1_ENABLED 1
 #define NRFX_TIMER2_ENABLED 1
-#define NRFX_TIMER3_ENABLED 1
-#define NRFX_TIMER4_ENABLED 1
+#define NRFX_TIMER3_ENABLED (!NRF51)
+#define NRFX_TIMER4_ENABLED (!NRF51)
 
 // Peripheral Resource Sharing
-#define NRFX_PRS_BOX_0_ENABLED (NRFX_TWI0_ENABLED && NRFX_SPI0_ENABLED)
-#define NRFX_PRS_BOX_1_ENABLED (NRFX_TWI1_ENABLED && NRFX_SPI1_ENABLED)
+#define NRFX_PRS_BOX_0_ENABLED (NRFX_TWI_ENABLED && NRFX_TWI0_ENABLED && NRFX_SPI_ENABLED && NRFX_SPI0_ENABLED)
+#define NRFX_PRS_BOX_1_ENABLED (NRFX_TWI_ENABLED && NRFX_TWI1_ENABLED && NRFX_SPI_ENABLED && NRFX_SPI1_ENABLED)
 #define NRFX_PRS_ENABLED (NRFX_PRS_BOX_0_ENABLED || NRFX_PRS_BOX_1_ENABLED)
 
 #endif // NRFX_CONFIG_H
