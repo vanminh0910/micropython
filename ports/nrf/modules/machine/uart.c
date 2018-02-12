@@ -44,6 +44,7 @@
 #include "mphalport.h"
 #include "nrfx_uart.h"
 
+#if MICROPY_PY_MACHINE_UART
 
 typedef struct _machine_hard_uart_obj_t {
     mp_obj_base_t       base;
@@ -381,3 +382,4 @@ const mp_obj_type_t machine_hard_uart_type = {
     .locals_dict = (mp_obj_dict_t*)&machine_hard_uart_locals_dict,
 };
 
+#endif // MICROPY_PY_MACHINE_UART
