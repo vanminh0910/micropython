@@ -36,7 +36,6 @@
 #include "nrf_sdm.h"
 #include "ble_gap.h"
 #include "ble.h" // sd_ble_uuid_encode
-#include "hal_irq.h"
 #include "drivers/flash.h"
 #include "mphalport.h"
 
