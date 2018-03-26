@@ -220,7 +220,7 @@ OBJ += $(BUILD)/pins_gen.o
 $(BUILD)/$(FATFS_DIR)/ff.o: COPT += -Os
 $(filter $(PY_BUILD)/../extmod/vfs_fat_%.o, $(PY_O)): COPT += -Os
 
-.phony: all flash sd binary hex
+.PHONY: all flash sd binary hex
 
 all: binary hex
 
