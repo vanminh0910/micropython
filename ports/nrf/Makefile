@@ -46,6 +46,7 @@ ifeq ($(DFU),)
 else ifeq ($(DFU),none)
 else ifeq ($(DFU),mbr)
 else ifeq ($(DFU),bootloader)
+	LDFLAGS += -Wl,--defsym=_bootloader_size=$(PAGESIZE)
 else
 	$(error DFU type unknown: $(DFU) (must be dfu, mbr or none))
 endif
@@ -135,7 +136,7 @@ CFLAGS += -DNRF5_HAL_H='<$(MCU_VARIANT)_hal.h>'
 CFLAGS += $(CFLAGS_LTO)
 CFLAGS += -DDFU_TYPE_$(DFU)
 
-LDFLAGS = $(CFLAGS)
+LDFLAGS += $(CFLAGS)
 LDFLAGS += -Xlinker -Map=$(@:.elf=.map)
 LDFLAGS += -mthumb -mabi=aapcs $(addprefix -T,$(LD_FILES)) -L boards/
 
