@@ -18,6 +18,11 @@ ifeq ($(SD), )
 	# If the build directory is not given, make it reflect the board name.
 	BUILD ?= build-$(BOARD)
 	include ../../py/mkenv.mk
+
+ifneq ($(DFU), none)
+$(error DFU depends on a SoftDevice. Provide one with SD=)
+endif
+
 else
 	# If the build directory is not given, make it reflect the board name.
 	BUILD ?= build-$(BOARD)-$(SD_LOWER)
