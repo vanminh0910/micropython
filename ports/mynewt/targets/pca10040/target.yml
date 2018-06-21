@@ -1,0 +1,2 @@
+target.app: "apps/micropython"
+target.bsp: "@apache-mynewt-core/hw/bsp/nrf52dk"
