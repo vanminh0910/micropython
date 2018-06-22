@@ -30,8 +30,10 @@
 #include "py/ringbuf.h"
 #include "lib/utils/interrupt_char.h"
 
+#ifndef NO_QSTR
 #include "hal/hal_watchdog.h"
 #include "uart/uart.h"
+#endif // NO_QSTR
 
 static struct uart_dev *uart_dev;
 

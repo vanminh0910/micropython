@@ -2,7 +2,7 @@
 .PHONY: all clean
 
 SRC = apps/micropython/src
-GENHDR = apps/micropython/src/genhdr
+GENHDR = bin/targets/pca10040/generated/include/genhdr
 
 INC += -I$(SRC)
 INC += -Irepos/apache-mynewt-core/hw/cmsis-core/src/ext
@@ -24,11 +24,11 @@ CLFAGS += -Wall -Werror -std=c99
 
 all: $(GENHDR)/mpversion.h $(GENHDR)/qstrdefs.generated.h
 	newt build pca10040
+	arm-none-eabi-size bin/targets/pca10040/app/apps/micropython/micropython.elf
 	newt create-image pca10040 1.0.0
 
 clean:
 	newt clean pca10040
-	rm -rf $(GENHDR)
 
 $(GENHDR)/mpversion.h:
 	@mkdir -p $(GENHDR)
@@ -36,7 +36,7 @@ $(GENHDR)/mpversion.h:
 
 $(GENHDR)/qstr.i.last:
 	@mkdir -p $(GENHDR)
-	arm-none-eabi-gcc -E -DNO_QSTR $(CFLAGS) -mthumb -mtune=cortex-m4 -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fsingle-precision-constant -Wdouble-promotion -Os -DNDEBUG $(SRC)/*.c >$(GENHDR)/qstr.i.last
+	arm-none-eabi-gcc -E -DNO_QSTR $(CFLAGS) -mthumb -mtune=cortex-m4 -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fsingle-precision-constant -Wdouble-promotion -Os -DNDEBUG $(SRC)/*.c > $(GENHDR)/qstr.i.last
 
 $(GENHDR)/qstr.split: $(GENHDR)/qstr.i.last
 	python ../../py/makeqstrdefs.py split $(GENHDR)/qstr.i.last $(GENHDR)/qstr $(GENHDR)/qstrdefs.collected.h
@@ -47,4 +47,4 @@ $(GENHDR)/qstrdefs.collected.h: $(GENHDR)/qstr.split
 
 $(GENHDR)/qstrdefs.generated.h: $(GENHDR)/qstrdefs.collected.h
 	cat ../../py/qstrdefs.h $(GENHDR)/qstrdefs.collected.h | sed 's/^Q(.*)/"&"/' | arm-none-eabi-gcc -E $(CFLAGS) -nostdlib -mthumb -mtune=cortex-m4 -mabi=aapcs-linux -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fsingle-precision-constant -Wdouble-promotion  -Os -DNDEBUG - | sed 's/^"\(Q(.*)\)"/\1/' > $(GENHDR)/qstrdefs.preprocessed.h
-	python ../../py/makeqstrdata.py $(GENHDR)/qstrdefs.preprocessed.h >$(GENHDR)/qstrdefs.generated.h
+	python ../../py/makeqstrdata.py $(GENHDR)/qstrdefs.preprocessed.h > $(GENHDR)/qstrdefs.generated.h

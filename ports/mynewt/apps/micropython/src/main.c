@@ -24,9 +24,11 @@
  * THE SOFTWARE.
  */
 
+#ifndef NO_QSTR
 #include "sysinit/sysinit.h"
 #include "os/os.h"
 #include "hal/hal_system.h"
+#endif // NO_QSTR
 
 #include "py/compile.h"
 #include "py/runtime.h"
