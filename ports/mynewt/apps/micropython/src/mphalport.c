@@ -94,7 +94,12 @@ int mp_hal_stdin_rx_chr(void) {
 // Called when a char arrives over serial.
 int hal_rx_char_cb(void *arg, uint8_t c) {
     if (c == mp_interrupt_char) {
+        // Reset buffer (as if never inputted) and raise
+        // KeyboardInterrupt.
+        uart_in.iget = 0;
+        uart_in.iput = 0;
         mp_keyboard_interrupt();
+        return 0;
     }
     if (os_sem_get_count(&uart_in_sem) == sizeof(uart_in_buf)) {
         return -1; // block input (when using flow control)
