@@ -1,8 +1,10 @@
 
 .PHONY: all clean
 
+BOARD=nrf52dk
+
 SRC = apps/micropython/src
-GENHDR = bin/targets/pca10040/generated/include/genhdr
+GENHDR = bin/targets/$(BOARD)/generated/include/genhdr
 
 INC += -I$(SRC)
 INC += -Irepos/apache-mynewt-core/hw/cmsis-core/src/ext
@@ -16,19 +18,19 @@ INC += -Irepos/apache-mynewt-core/sys/console/minimal/include
 INC += -Irepos/apache-mynewt-core/sys/defs/include
 INC += -Irepos/apache-mynewt-core/sys/flash_map/include
 INC += -Irepos/apache-mynewt-nimble/porting/nimble/include
-INC += -Ibin/targets/pca10040/generated/include
+INC += -Ibin/targets/$(BOARD)/generated/include
 
 CFLAGS += $(INC)
 CFLAGS += -DNRF52832_XXAA
 CLFAGS += -Wall -Werror -std=c99
 
 all: $(GENHDR)/mpversion.h $(GENHDR)/qstrdefs.generated.h
-	newt build pca10040
-	arm-none-eabi-size bin/targets/pca10040/app/apps/micropython/micropython.elf
-	newt create-image pca10040 1.0.0
+	@newt build $(BOARD)
+	@arm-none-eabi-size bin/targets/$(BOARD)/app/apps/micropython/micropython.elf
+	@newt create-image $(BOARD) 1.0.0
 
 clean:
-	newt clean pca10040
+	@newt clean $(BOARD)
 
 $(GENHDR)/mpversion.h:
 	@mkdir -p $(GENHDR)
