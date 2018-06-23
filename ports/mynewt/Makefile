@@ -31,6 +31,9 @@ all: $(GENHDR)/mpversion.h $(GENHDR)/qstrdefs.generated.h
 	@arm-none-eabi-size bin/targets/$(BOARD)/app/apps/micropython/micropython.elf
 	@newt create-image $(BOARD) 1.0.0
 
+flash: all
+	@newt load $(BOARD)
+
 clean:
 	@newt clean $(BOARD)
 
