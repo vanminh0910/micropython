@@ -28,6 +28,7 @@
 #include "sysinit/sysinit.h"
 #include "os/os.h"
 #include "hal/hal_system.h"
+#include "host/ble_hs.h"
 #endif // NO_QSTR
 
 #include "py/compile.h"
@@ -37,6 +38,7 @@
 #include "py/mperrno.h"
 #include "lib/utils/pyexec.h"
 #include "mphalport.h"
+#include "ble.h"
 
 static uint32_t heap[8192 / sizeof(uint32_t)]; // 8kB
 
@@ -53,13 +55,14 @@ int main(int argc, char **argv) {
     // init system
     sysinit();
     uart_init();
+    ble_init();
 
     // init MicroPython
     gc_init(heap, heap + MP_ARRAY_SIZE(heap));
     mp_init();
 
     // start main thread
-    os_task_init(&main_task, "main", main_handler, NULL, 8,
+    os_task_init(&main_task, "main", main_handler, NULL, 0xef,
             OS_WAIT_FOREVER, main_stack, sizeof(main_stack)/sizeof(main_stack[0]));
 
     // run OS scheduler

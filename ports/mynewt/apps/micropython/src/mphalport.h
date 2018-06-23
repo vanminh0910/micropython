@@ -8,3 +8,5 @@ static inline mp_uint_t mp_hal_ticks_ms(void) { return 0; }
 void mp_hal_stdout_tx_str(const char *str);
 
 void uart_init();
+
+int hal_rx_char_cb(void *arg, uint8_t c);

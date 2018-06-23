@@ -35,6 +35,8 @@
 #include "uart/uart.h"
 #endif // NO_QSTR
 
+#include "ble.h"
+
 static struct uart_dev *uart_dev;
 
 static uint8_t uart_out_buf[20];
@@ -42,10 +44,11 @@ static ringbuf_t uart_out = {uart_out_buf, sizeof(uart_out)};
 
 static uint8_t uart_in_buf[20];
 static ringbuf_t uart_in = {uart_in_buf, sizeof(uart_in)};
-struct os_sem uart_in_sem;
+static struct os_sem uart_in_sem;
 
 // Send a single char. Block when the buffer has been filled.
-static void mp_hal_stdout_tx_chr(uint8_t c) {
+void mp_hal_stdout_tx_chr(uint8_t c) {
+    ble_nus_tx(c);
     while (ringbuf_put(&uart_out, c) < 0) {
         os_sched(NULL);
     }
@@ -70,7 +73,7 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, size_t len) {
 }
 
 // Called to send a char, after uart_start_tx() has been called.
-static int tx_char_cb(void *arg) {
+static int hal_tx_char_cb(void *arg) {
     // Returns the char, or -1 when finished. This neatly matches the
     // ringbuf API.
     return ringbuf_get(&uart_out);
@@ -89,7 +92,7 @@ int mp_hal_stdin_rx_chr(void) {
 }
 
 // Called when a char arrives over serial.
-static int rx_char_cb(void *arg, uint8_t c) {
+int hal_rx_char_cb(void *arg, uint8_t c) {
     if (c == mp_interrupt_char) {
         mp_keyboard_interrupt();
     }
@@ -114,8 +117,8 @@ void uart_init() {
         .uc_stopbits = 1,
         .uc_parity = UART_PARITY_NONE,
         .uc_flow_ctl = MYNEWT_VAL(CONSOLE_UART_FLOW_CONTROL),
-        .uc_tx_char = tx_char_cb,
-        .uc_rx_char = rx_char_cb,
+        .uc_tx_char = hal_tx_char_cb,
+        .uc_rx_char = hal_rx_char_cb,
     };
     uart_dev = (struct uart_dev *)os_dev_open(MYNEWT_VAL(CONSOLE_UART_DEV), OS_TIMEOUT_NEVER, &uc);
 }

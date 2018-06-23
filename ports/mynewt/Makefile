@@ -17,6 +17,8 @@ INC += -Irepos/apache-mynewt-core/kernel/os/include/os/arch/cortex_m4
 INC += -Irepos/apache-mynewt-core/sys/console/minimal/include
 INC += -Irepos/apache-mynewt-core/sys/defs/include
 INC += -Irepos/apache-mynewt-core/sys/flash_map/include
+INC += -Irepos/apache-mynewt-nimble/nimble/host/include
+INC += -Irepos/apache-mynewt-nimble/nimble/include
 INC += -Irepos/apache-mynewt-nimble/porting/nimble/include
 INC += -Ibin/targets/$(BOARD)/generated/include
 

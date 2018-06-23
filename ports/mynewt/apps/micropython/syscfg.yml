@@ -22,19 +22,20 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-pkg.name: apps/micropython
-pkg.type: app
-pkg.description: Basic example application which blinks an LED.
-pkg.author: "Ayke van Laethem <aykevanlaethem@gmail.com>"
-pkg.homepage: "https://github.com/aykevl/micropython/tree/mynewt"
-pkg.keywords: python
+syscfg.vals:
+    # Check for stack overflow.
+    OS_CTX_SW_STACK_CHECK: 1
+    OS_MAIN_STACK_SIZE: 256
 
-pkg.deps:
-    - "@apache-mynewt-core/kernel/os"
-    - "@apache-mynewt-core/hw/hal"
-    - "@apache-mynewt-core/sys/log/stub"
-    - "@apache-mynewt-core/sys/console/stub"
-    - "@apache-mynewt-core/sys/stats/stub"
-    - "@apache-mynewt-core/net/nimble/controller"
-    - "@apache-mynewt-core/net/nimble/host"
-    - "@apache-mynewt-core/net/nimble/transport/ram"
+    # Reduce RAM consumption.
+    BLE_HCI_EVT_LO_BUF_COUNT: 2
+    BLE_HCI_EVT_HI_BUF_COUNT: 1
+    BLE_ATT_SVR_MAX_PREP_ENTRIES: 0
+
+    # Disable unused features.
+    BLE_ROLE_CENTRAL: 0
+    BLE_ROLE_OBSERVER: 0
+    BLE_ATT_SVR_INDICATE: 0
+    BLE_ATT_SVR_NOTIFY: 0
+    BLE_ATT_SVR_QUEUED_WRITE: 0
+    BLE_ATT_SVR_READ: 0
