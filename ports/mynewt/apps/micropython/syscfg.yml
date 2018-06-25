@@ -25,12 +25,16 @@
 syscfg.vals:
     # Check for stack overflow.
     OS_CTX_SW_STACK_CHECK: 1
-    OS_MAIN_STACK_SIZE: 256
+    OS_MAIN_STACK_SIZE: 128
 
     # Reduce RAM consumption.
     BLE_HCI_EVT_LO_BUF_COUNT: 2
     BLE_HCI_EVT_HI_BUF_COUNT: 1
+    BLE_ATT_PREFERRED_MTU: 23
     BLE_ATT_SVR_MAX_PREP_ENTRIES: 0
+    MSYS_1_BLOCK_SIZE: 77
+    BLE_LL_CFG_FEAT_LL_PRIVACY: 0
+    BLE_LL_CFG_FEAT_LE_ENCRYPTION: 0
 
     # Disable unused features.
     BLE_ROLE_CENTRAL: 0

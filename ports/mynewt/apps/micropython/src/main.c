@@ -40,13 +40,18 @@
 #include "mphalport.h"
 #include "ble.h"
 
-static uint32_t heap[8192 / sizeof(uint32_t)]; // 8kB
+static uint32_t heap[4096 / sizeof(uint32_t)]; // 8kB
 
 static struct os_task main_task;
 static os_stack_t main_stack[1024]; // 4kB on 32-bit MCUs
 
 // Main task.
 static void main_handler() {
+    // init MicroPython
+    gc_init(heap, heap + MP_ARRAY_SIZE(heap));
+    mp_init();
+
+    // run REPL (until Ctrl-D)
     pyexec_friendly_repl();
     hal_system_reset();
 }
@@ -56,10 +61,6 @@ int main(int argc, char **argv) {
     sysinit();
     uart_init();
     ble_init();
-
-    // init MicroPython
-    gc_init(heap, heap + MP_ARRAY_SIZE(heap));
-    mp_init();
 
     // start main thread
     os_task_init(&main_task, "main", main_handler, NULL, 0xef,
