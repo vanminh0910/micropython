@@ -18,3 +18,7 @@
 [submodule "lib/nrfx"]
 	path = lib/nrfx
 	url = https://github.com/NordicSemiconductor/nrfx.git
+[submodule "lib/nimble"]
+	path = lib/nimble
+	url = https://github.com/aykevl/mynewt-nimble.git
+	branch = micropython

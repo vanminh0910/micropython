@@ -25,6 +25,7 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 
 extern uint32_t _estack;
 extern uint32_t _sidata;
@@ -38,8 +39,28 @@ typedef void (*func)(void);
 extern void  _start(void) __attribute__((noreturn));
 extern void SystemInit(void);
 
-void Default_Handler(void) {
-    while (1);
+__attribute__((naked))
+void Default_Handler() {
+    __asm__ __volatile__(
+            "mov r0, sp\n"
+            "b Default_Handler_C\n"
+            );
+}
+
+__attribute__((used))
+void Default_Handler_C(uint32_t stack[]) {
+    enum { R0, R1, R2, R3, R12, LR, PC, PSR};
+    printf("ERROR: Other\n");
+    printf("r0  = 0x%08lx\n", stack[R0]);
+    printf("r1  = 0x%08lx\n", stack[R1]);
+    printf("r2  = 0x%08lx\n", stack[R2]);
+    printf("r3  = 0x%08lx\n", stack[R3]);
+    printf("r12 = 0x%08lx\n", stack[R12]);
+    printf("lr  = 0x%08lx\n", stack[LR]);
+    printf("pc  = 0x%08lx\n", stack[PC]);
+    printf("psr = 0x%08lx\n", stack[PSR]);
+    while (1) {
+    }
 }
 
 void Reset_Handler(void) {

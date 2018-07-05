@@ -58,9 +58,18 @@ INC += -I./modules/music
 INC += -I./modules/random
 INC += -I./modules/ble
 INC += -I./modules/board
+INC += -I./nimble
 INC += -I../../lib/mp-readline
 INC += -I./drivers/bluetooth
 INC += -I./drivers
+INC += -I../../lib/nimble/ext/tinycrypt/include
+INC += -I../../lib/nimble/nimble/controller/include
+INC += -I../../lib/nimble/nimble/drivers/$(MCU_VARIANT)/include
+INC += -I../../lib/nimble/nimble/host/include
+INC += -I../../lib/nimble/nimble/host/store/ram/include
+INC += -I../../lib/nimble/nimble/include
+INC += -I../../lib/nimble/nimble/transport/ram/include
+INC += -I../../lib/nimble/porting/nimble/include
 INC += -I../../lib/nrfx/
 INC += -I../../lib/nrfx/drivers
 INC += -I../../lib/nrfx/drivers/include
@@ -106,8 +115,10 @@ CFLAGS += $(INC) -Wall -Werror -g -ansi -std=c11 -nostdlib $(COPT) $(NRF_DEFINES
 CFLAGS += -fno-strict-aliasing
 CFLAGS += -Iboards/$(BOARD)
 CFLAGS += -DNRF5_HAL_H='<$(MCU_VARIANT)_hal.h>'
+CFLAGS += -Wno-error=unused-but-set-variable -Wno-error=maybe-uninitialized
+CFLAGS += -DNIMBLE_CFG_CONTROLLER=1
 
-LDFLAGS = $(CFLAGS)
+LDFLAGS += $(CFLAGS)
 LDFLAGS += -Xlinker -Map=$(@:.elf=.map)
 LDFLAGS += -mthumb -mabi=aapcs $(addprefix -T,$(LD_FILES)) -L boards/
 
@@ -168,6 +179,94 @@ SRC_LIB += $(addprefix lib/,\
 endif
 
 
+SRC_NIMBLE += $(addprefix lib/nimble/,\
+	ext/tinycrypt/src/aes_decrypt.c \
+	ext/tinycrypt/src/aes_encrypt.c \
+	ext/tinycrypt/src/cbc_mode.c \
+	ext/tinycrypt/src/ccm_mode.c \
+	ext/tinycrypt/src/cmac_mode.c \
+	ext/tinycrypt/src/ctr_mode.c \
+	ext/tinycrypt/src/ctr_prng.c \
+	ext/tinycrypt/src/ecc.c \
+	ext/tinycrypt/src/ecc_dh.c \
+	ext/tinycrypt/src/ecc_dsa.c \
+	ext/tinycrypt/src/ecc_platform_specific.c \
+	ext/tinycrypt/src/hmac.c \
+	ext/tinycrypt/src/hmac_prng.c \
+	ext/tinycrypt/src/sha256.c \
+	ext/tinycrypt/src/utils.c \
+	nimble/controller/src/ble_ll_adv.c \
+	nimble/controller/src/ble_ll.c \
+	nimble/controller/src/ble_ll_conn.c \
+	nimble/controller/src/ble_ll_conn_hci.c \
+	nimble/controller/src/ble_ll_ctrl.c \
+	nimble/controller/src/ble_ll_dtm.c \
+	nimble/controller/src/ble_ll_hci.c \
+	nimble/controller/src/ble_ll_hci_ev.c \
+	nimble/controller/src/ble_ll_rand.c \
+	nimble/controller/src/ble_ll_resolv.c \
+	nimble/controller/src/ble_ll_scan.c \
+	nimble/controller/src/ble_ll_sched.c \
+	nimble/controller/src/ble_ll_supp_cmd.c \
+	nimble/controller/src/ble_ll_trace.c \
+	nimble/controller/src/ble_ll_whitelist.c \
+	nimble/controller/src/ble_ll_xcvr.c \
+	nimble/drivers/$(MCU_VARIANT)/src/ble_hw.c \
+	nimble/drivers/$(MCU_VARIANT)/src/ble_phy.c \
+	nimble/host/src/ble_att.c \
+	nimble/host/src/ble_att_clt.c \
+	nimble/host/src/ble_att_cmd.c \
+	nimble/host/src/ble_att_svr.c \
+	nimble/host/src/ble_eddystone.c \
+	nimble/host/src/ble_gap.c \
+	nimble/host/src/ble_gattc.c \
+	nimble/host/src/ble_gatts.c \
+	nimble/host/src/ble_hs_adv.c \
+	nimble/host/src/ble_hs_atomic.c \
+	nimble/host/src/ble_hs.c \
+	nimble/host/src/ble_hs_cfg.c \
+	nimble/host/src/ble_hs_conn.c \
+	nimble/host/src/ble_hs_dbg.c \
+	nimble/host/src/ble_hs_flow.c \
+	nimble/host/src/ble_hs_hci.c \
+	nimble/host/src/ble_hs_hci_cmd.c \
+	nimble/host/src/ble_hs_hci_evt.c \
+	nimble/host/src/ble_hs_hci_util.c \
+	nimble/host/src/ble_hs_id.c \
+	nimble/host/src/ble_hs_log.c \
+	nimble/host/src/ble_hs_mbuf.c \
+	nimble/host/src/ble_hs_misc.c \
+	nimble/host/src/ble_hs_mqueue.c \
+	nimble/host/src/ble_hs_pvcy.c \
+	nimble/host/src/ble_hs_startup.c \
+	nimble/host/src/ble_ibeacon.c \
+	nimble/host/src/ble_l2cap.c \
+	nimble/host/src/ble_l2cap_coc.c \
+	nimble/host/src/ble_l2cap_sig.c \
+	nimble/host/src/ble_l2cap_sig_cmd.c \
+	nimble/host/src/ble_monitor.c \
+	nimble/host/src/ble_sm_alg.c \
+	nimble/host/src/ble_sm.c \
+	nimble/host/src/ble_sm_cmd.c \
+	nimble/host/src/ble_sm_lgcy.c \
+	nimble/host/src/ble_sm_sc.c \
+	nimble/host/src/ble_store.c \
+	nimble/host/src/ble_store_util.c \
+	nimble/host/src/ble_uuid.c \
+	nimble/host/store/ram/src/ble_store_ram.c \
+	nimble/src/hci_common.c \
+	nimble/transport/ram/src/ble_hci_ram.c \
+	porting/nimble/src/endian.c \
+	porting/nimble/src/hal_timer.c \
+	porting/nimble/src/mem.c \
+	porting/nimble/src/nimble_port.c \
+	porting/nimble/src/os_cputime.c \
+	porting/nimble/src/os_cputime_pwr2.c \
+	porting/nimble/src/os_mbuf.c \
+	porting/nimble/src/os_mempool.c \
+	porting/nimble/src/os_msys_init.c \
+	)
+
 SRC_NRFX += $(addprefix lib/nrfx/drivers/src/,\
 	prs/nrfx_prs.c \
 	nrfx_uart.c \
@@ -199,6 +298,9 @@ SRC_C += \
 	drivers/ticker.c \
 	drivers/bluetooth/ble_drv.c \
 	drivers/bluetooth/ble_uart.c \
+	nimble/nimble.c \
+	nimble/libc.c \
+	nimble/blenus.c \
 
 DRIVERS_SRC_C += $(addprefix modules/,\
 	machine/modmachine.c \
@@ -245,6 +347,7 @@ endif
 OBJ += $(PY_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_LIB:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_MOD:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(SRC_NIMBLE:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_NRFX_HAL:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))

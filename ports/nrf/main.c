@@ -61,6 +61,8 @@
 #include "nrf_sdm.h"
 #endif
 
+#include "nimble.h"
+
 #if (MICROPY_PY_BLE_NUS)
 #include "ble_uart.h"
 #endif
@@ -208,6 +210,8 @@ pin_init0();
     ble_uart_init0();
 #endif
 
+    nimble_init();
+
 #if MICROPY_PY_MACHINE_SOFT_PWM
     ticker_init0();
     softpwm_init0();
@@ -256,6 +260,7 @@ pin_init0();
     sd_softdevice_disable();
 #endif
 
+    NVIC_SystemReset();
     goto soft_reset;
 
     return 0;
@@ -294,8 +299,29 @@ MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_open_obj, 1, mp_builtin_open);
 #endif
 #endif
 
-void HardFault_Handler(void)
-{
+__attribute__((naked))
+void HardFault_Handler() {
+    __asm__ __volatile__(
+            "mov r0, sp\n"
+            "b HardFault_Handler_C\n"
+            );
+}
+
+__attribute__((used))
+void HardFault_Handler_C(uint32_t stack[]) {
+    enum { R0, R1, R2, R3, R12, LR, PC, PSR};
+    printf("ERROR: HardFault\n");
+    printf("r0  = 0x%08lx\n", stack[R0]);
+    printf("r1  = 0x%08lx\n", stack[R1]);
+    printf("r2  = 0x%08lx\n", stack[R2]);
+    printf("r3  = 0x%08lx\n", stack[R3]);
+    printf("r12 = 0x%08lx\n", stack[R12]);
+    printf("lr  = 0x%08lx\n", stack[LR]);
+    printf("pc  = 0x%08lx\n", stack[PC]);
+    printf("psr = 0x%08lx\n", stack[PSR]);
+    while (1) {
+        __WFI();
+    }
 #if defined(NRF52_SERIES)
 	static volatile uint32_t reg;
 	static volatile uint32_t reg2;
